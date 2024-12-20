@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ process_name }} - PDD</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .field {
+            margin-bottom: 15px;
+        }
+        .field-label {
+            font-weight: bold;
+            color: #666;
+        }
+        .field-value {
+            margin-top: 5px;
+            white-space: pre-line;
+        }
+    </style>
+</head>
+<body>
+    <h1>Process Definition Document (PDD)</h1>
+    
+    <div class="section">
+        <h2>1. Informações do Processo</h2>
+        <div class="field">
+            <div class="field-label">Nome do Processo:</div>
+            <div class="field-value">{{ process_name }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">Responsável:</div>
+            <div class="field-value">{{ process_owner }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">Descrição:</div>
+            <div class="field-value">{{ process_description }}</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>2. Detalhes do Processo</h2>
+        <div class="field">
+            <div class="field-label">Passos do Processo:</div>
+            <div class="field-value">{{ steps_as_is }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">Sistemas/Ferramentas:</div>
+            <div class="field-value">{{ systems }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">Dados Utilizados:</div>
+            <div class="field-value">{{ data_used }}</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>3. Regras e Exceções</h2>
+        <div class="field">
+            <div class="field-label">Regras de Negócio:</div>
+            <div class="field-value">{{ business_rules }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">Exceções:</div>
+            <div class="field-value">{{ exceptions }}</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>4. Objetivos e KPIs</h2>
+        <div class="field">
+            <div class="field-label">Objetivos da Automação:</div>
+            <div class="field-value">{{ automation_goals }}</div>
+        </div>
+        <div class="field">
+            <div class="field-label">KPIs:</div>
+            <div class="field-value">{{ kpis }}</div>
+        </div>
+    </div>
+</body>
+</html> 

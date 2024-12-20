@@ -1,0 +1,33 @@
+app:
+  title: "Agente Analista de RPA"
+  description: "Assistente para criação de documentos PDD para automação RPA"
+  version: "1.0.0"
+
+forms:
+  validation:
+    required_fields:
+      identification:
+        - process_name
+        - process_owner
+        - process_description
+      process_details:
+        - steps_as_is
+        - systems
+        - data_used
+      business_rules:
+        - business_rules
+        - exceptions
+      automation_goals:
+        - automation_goals
+        - kpis
+  labels:
+    process_name: "Nome do Processo"
+    process_owner: "Responsável pelo Processo"
+    process_description: "Descrição do Processo"
+    steps_as_is: "Passos do Processo"
+    systems: "Sistemas/Ferramentas"
+    data_used: "Dados Utilizados"
+    business_rules: "Regras de Negócio"
+    exceptions: "Exceções"
+    automation_goals: "Objetivos da Automação"
+    kpis: "KPIs"
