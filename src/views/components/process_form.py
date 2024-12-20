@@ -1,9 +1,13 @@
 import streamlit as st
 from typing import Callable, Optional, List
-from utils.validators import FormValidator
+from src.utils.validators import FormValidator
 
 def validate_and_submit(data: dict, required_fields: List[str], on_submit: Callable) -> bool:
     """Valida os dados e submete o formulário se válido."""
+    if on_submit is None:
+        st.error("Callback de submissão não fornecido")
+        return False
+        
     validator = FormValidator()
     is_valid, missing_fields = validator.validate_required_fields(data, required_fields)
     
@@ -12,21 +16,33 @@ def validate_and_submit(data: dict, required_fields: List[str], on_submit: Calla
         st.error(f"Por favor, preencha os campos obrigatórios: {', '.join(missing_labels)}")
         return False
     
-    on_submit(data)
-    return True
+    try:
+        on_submit(data)
+        return True
+    except Exception as e:
+        st.error(f"Erro ao submeter formulário: {str(e)}")
+        return False
 
-def render_process_identification(on_submit: Optional[Callable] = None):
+def render_process_identification(on_submit: Optional[Callable] = None, initial_data: dict = None):
     """Renderiza o formulário de identificação do processo."""
-    with st.form("process_info"):
-        process_name = st.text_input("Nome do processo: *")
-        process_owner = st.text_input("Responsável pelo processo (Owner): *")
+    initial_data = initial_data or {}
+    
+    with st.form("identification_form"):
+        process_name = st.text_input(
+            "Nome do processo: *",
+            value=initial_data.get('process_name', ''),
+        )
+        process_owner = st.text_input(
+            "Responsável pelo processo (Owner): *",
+            value=initial_data.get('process_owner', ''),
+        )
         process_description = st.text_area(
             "Descrição do processo: *",
+            value=initial_data.get('process_description', ''),
             help="Descreva brevemente o objetivo do processo e seu contexto."
         )
-
-        submitted = st.form_submit_button("Salvar informações do Processo")
-        if submitted:
+        
+        if st.form_submit_button("Avançar →"):
             data = {
                 "process_name": process_name,
                 "process_owner": process_owner,
@@ -34,29 +50,34 @@ def render_process_identification(on_submit: Optional[Callable] = None):
             }
             required_fields = ["process_name", "process_owner", "process_description"]
             if validate_and_submit(data, required_fields, on_submit):
-                st.success("Informações do processo salvas com sucesso!")
+                st.success("Informações salvas com sucesso!")
 
-def render_process_details(on_submit: Optional[Callable] = None):
+def render_process_details(on_submit: Optional[Callable] = None, initial_data: dict = None):
     """Renderiza o formulário de detalhes do processo."""
+    if initial_data is None:
+        initial_data = {}
+        
     with st.form("as_is_form"):
         st.write("Quais são as etapas atuais do processo?")
         steps = st.text_area(
             "Passos do Processo (As-Is): *",
+            value=initial_data.get('steps_as_is', ''),
             help="Liste as etapas na ordem em que ocorrem."
         )
         
         systems = st.text_input(
             "Sistemas / Ferramentas: *",
+            value=initial_data.get('systems', ''),
             help="Ex: ERP SAP, CRM Salesforce, Excel..."
         )
 
         data_used = st.text_area(
             "Dados utilizados/produzidos: *",
+            value=initial_data.get('data_used', ''),
             help="Ex: Dados cadastrais, registros de estoque..."
         )
         
-        submitted = st.form_submit_button("Salvar detalhes (As-Is)")
-        if submitted:
+        if st.form_submit_button("Salvar detalhes (As-Is)"):
             data = {
                 "steps_as_is": steps,
                 "systems": systems,

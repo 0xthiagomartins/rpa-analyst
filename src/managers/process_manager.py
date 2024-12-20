@@ -1,9 +1,7 @@
 from typing import Dict, Optional, List
 from src.models.process import Process
 from src.utils.validators import FormValidator
-import logging
-
-logger = logging.getLogger(__name__)
+from src.utils import logger
 
 class ProcessManager:
     """Gerencia o ciclo de vida dos processos."""

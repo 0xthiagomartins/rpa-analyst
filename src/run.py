@@ -5,4 +5,7 @@ sys.path.insert(0, parent_dir)
 src_dir = os.path.join(parent_dir, "src")
 sys.path.insert(0, src_dir)
 
-from src import app
+from src.app import main
+
+if __name__ == "__main__":
+    main()

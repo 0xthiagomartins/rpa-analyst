@@ -1,4 +1,5 @@
 import streamlit as st
+from src.utils import logger
 from src.controllers.process_controller import ProcessController
 from src.views.components.process_form import (
     render_process_identification,
@@ -6,7 +7,6 @@ from src.views.components.process_form import (
     render_business_rules,
     render_automation_goals
 )
-from src.utils import AppContext
 
 # Configuração da página
 st.set_page_config(
@@ -15,68 +15,91 @@ st.set_page_config(
     layout="wide"
 )
 
-# Inicialização do contexto
-app_context = AppContext()
-config = app_context.get_config()
+# Inicialização do estado
+if 'app_state' not in st.session_state:
+    st.session_state.app_state = {
+        'step': 0,
+        'controller': ProcessController(),
+        'form_data': {},
+    }
 
-# Inicialização do controlador
-if 'process_controller' not in st.session_state:
-    st.session_state.process_controller = ProcessController()
+def get_state(key, default=None):
+    return st.session_state.app_state.get(key, default)
 
-# Inicialização do estado de progresso
-if 'current_step' not in st.session_state:
-    st.session_state.current_step = 0
+def set_state(key, value):
+    st.session_state.app_state[key] = value
 
-st.title("Agente Analista de RPA")
-st.write("Este agente irá guiá-lo na coleta de informações para criação de um documento PDD.")
-
-# Callbacks
 def handle_form_submit(data: dict):
-    controller = st.session_state.process_controller
-    current_process = controller.get_current_process()
+    """Processa o envio do formulário."""
+    try:
+        controller = get_state('controller')
+        current_process = controller.get_current_process()
+        
+        if current_process:
+            updated_data = current_process.to_dict()
+            updated_data.update(data)
+            controller.update_process(updated_data)
+        else:
+            controller.create_process(data)
+        
+        # Atualiza os dados do formulário
+        form_data = get_state('form_data', {})
+        form_data[get_state('step')] = data
+        set_state('form_data', form_data)
+        
+        # Avança para próxima etapa
+        set_state('step', get_state('step') + 1)
+        return True
+        
+    except Exception as e:
+        logger.error(f"Erro ao processar formulário: {e}")
+        st.error(f"Erro ao processar formulário: {str(e)}")
+        return False
+
+def render_navigation():
+    """Renderiza a navegação entre etapas."""
+    steps = ["Identificação", "Detalhes", "Regras", "Objetivos"]
+    current_step = get_state('step')
     
-    if current_process:
-        updated_data = current_process.to_dict()
-        updated_data.update(data)
-        controller.update_process(updated_data)
-    else:
-        controller.create_process(data)
+    cols = st.columns([1, 4, 1])
     
-    # Avança para o próximo passo
-    st.session_state.current_step += 1
+    # Botão Voltar
+    with cols[0]:
+        if current_step > 0:
+            if st.button("← Voltar"):
+                set_state('step', current_step - 1)
+                st.experimental_rerun()
+    
+    # Progresso
+    with cols[1]:
+        st.progress(current_step / len(steps))
+        st.write(f"Etapa atual: {steps[current_step]}")
 
-# Barra de progresso
-steps = ["Identificação", "Detalhes", "Regras", "Objetivos"]
-progress = st.progress(st.session_state.current_step / len(steps))
-st.write(f"Etapa atual: {steps[st.session_state.current_step]}")
+def render_current_step():
+    """Renderiza o formulário da etapa atual."""
+    current_step = get_state('step')
+    form_data = get_state('form_data', {})
+    current_data = form_data.get(current_step, {})
+    
+    if current_step == 0:
+        st.header("Identificação do Processo")
+        render_process_identification(handle_form_submit, current_data)
+    elif current_step == 1:
+        st.header("Detalhamento do Processo Atual (As-Is)")
+        render_process_details(handle_form_submit, current_data)
+    elif current_step == 2:
+        st.header("Regras de Negócio e Exceções")
+        render_business_rules(handle_form_submit, current_data)
+    elif current_step == 3:
+        st.header("Objetivos da Automação e KPIs")
+        render_automation_goals(handle_form_submit, current_data)
+    elif current_step >= 4:
+        render_pdd_preview()
 
-# Renderização dos formulários baseada no passo atual
-if st.session_state.current_step == 0:
-    st.header("Identificação do Processo")
-    render_process_identification(handle_form_submit)
-
-elif st.session_state.current_step == 1:
-    st.header("Detalhamento do Processo Atual (As-Is)")
-    render_process_details(handle_form_submit)
-
-elif st.session_state.current_step == 2:
-    st.header("Regras de Negócio e Exceções")
-    render_business_rules(handle_form_submit)
-
-elif st.session_state.current_step == 3:
-    st.header("Objetivos da Automação e KPIs")
-    render_automation_goals(handle_form_submit)
-
-# Botão para voltar
-if st.session_state.current_step > 0:
-    if st.button("← Voltar"):
-        st.session_state.current_step -= 1
-        st.rerun()
-
-# Exibição do PDD quando todas as etapas forem concluídas
-if st.session_state.current_step >= len(steps):
+def render_pdd_preview():
+    """Renderiza a prévia do PDD."""
     st.success("Todas as informações foram coletadas!")
-    process = st.session_state.process_controller.get_current_process()
+    process = get_state('controller').get_current_process()
     
     if process:
         st.header("Documento PDD Gerado")
@@ -106,3 +129,14 @@ if st.session_state.current_step >= len(steps):
             st.write(process.automation_goals)
             st.write("**KPIs:**")
             st.write(process.kpis)
+
+def main():
+    """Função principal da aplicação."""
+    st.title("Agente Analista de RPA")
+    st.write("Este agente irá guiá-lo na coleta de informações para criação de um documento PDD.")
+    
+    render_navigation()
+    render_current_step()
+
+if __name__ == "__main__":
+    main()
