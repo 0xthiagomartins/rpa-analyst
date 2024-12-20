@@ -71,11 +71,17 @@ class ProcessManager:
     def _validate_update(self, data: dict) -> None:
         """Valida dados de atualização baseado na etapa atual."""
         # Identifica qual seção está sendo atualizada
-        sections = ['identification', 'process_details', 'business_rules', 'automation_goals']
+        if any(key in data for key in ['process_name', 'process_owner', 'process_description']):
+            errors = self.validator.validate_form(data, 'identification')
+        elif any(key in data for key in ['steps_as_is', 'systems', 'data_used']):
+            errors = self.validator.validate_form(data, 'process_details')
+        elif any(key in data for key in ['business_rules', 'exceptions']):
+            errors = self.validator.validate_form(data, 'business_rules')
+        elif any(key in data for key in ['automation_goals', 'kpis']):
+            errors = self.validator.validate_form(data, 'automation_goals')
+        else:
+            return  # Se não houver campos para validar, retorna sem erro
         
-        for section in sections:
-            if any(key in data for key in self.validator.config.get_required_fields(section)):
-                errors = self.validator.validate_form(data, section)
-                if errors:
-                    error_messages = [f"{error.field}: {error.message}" for error in errors]
-                    raise ValueError(f"Dados inválidos para {section}: {', '.join(error_messages)}") 
+        if errors:
+            error_messages = [f"{error.field}: {error.message}" for error in errors]
+            raise ValueError(f"Dados inválidos: {', '.join(error_messages)}")

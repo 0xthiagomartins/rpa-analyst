@@ -44,11 +44,15 @@ def handle_form_submit(data: dict):
         
         # Atualiza os dados do formulário
         form_data = get_state('form_data', {})
-        form_data[get_state('step')] = data
+        current_step = get_state('step')
+        form_data[current_step] = data
         set_state('form_data', form_data)
         
-        # Avança para próxima etapa
-        set_state('step', get_state('step') + 1)
+        # Avança para próxima etapa (limitado ao máximo de etapas)
+        next_step = current_step + 1
+        max_step = 4  # 0: Identificação, 1: Detalhes, 2: Regras, 3: Objetivos, 4: Revisão
+        set_state('step', min(next_step, max_step))
+        
         return True
         
     except Exception as e:
@@ -58,8 +62,13 @@ def handle_form_submit(data: dict):
 
 def render_navigation():
     """Renderiza a navegação entre etapas."""
-    steps = ["Identificação", "Detalhes", "Regras", "Objetivos"]
+    steps = ["Identificação", "Detalhes", "Regras", "Objetivos", "Revisão"]
     current_step = get_state('step')
+    max_step = len(steps) - 1
+    
+    # Garante que current_step não ultrapasse o máximo
+    current_step = min(current_step, max_step)
+    set_state('step', current_step)  # Atualiza o estado se necessário
     
     cols = st.columns([1, 4, 1])
     
@@ -68,12 +77,16 @@ def render_navigation():
         if current_step > 0:
             if st.button("← Voltar"):
                 set_state('step', current_step - 1)
-                st.experimental_rerun()
+                st.rerun()
     
     # Progresso
     with cols[1]:
-        st.progress(current_step / len(steps))
-        st.write(f"Etapa atual: {steps[current_step]}")
+        progress_value = current_step / max_step if max_step > 0 else 0
+        st.progress(progress_value)
+        if current_step >= max_step:
+            st.write("Revisão Final")
+        else:
+            st.write(f"Etapa atual: {steps[current_step]}")
 
 def render_current_step():
     """Renderiza o formulário da etapa atual."""
@@ -94,7 +107,23 @@ def render_current_step():
         st.header("Objetivos da Automação e KPIs")
         render_automation_goals(handle_form_submit, current_data)
     elif current_step >= 4:
+        st.header("Revisão do PDD")
         render_pdd_preview()
+        
+        # Adiciona botões de ação final
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col1:
+            if st.button("← Editar", use_container_width=True):
+                set_state('step', 0)
+                st.rerun()
+        with col2:
+            if st.button("📥 Baixar PDF", use_container_width=True):
+                # TODO: Implementar download do PDF
+                st.info("Funcionalidade de download em desenvolvimento")
+        with col3:
+            if st.button("✉️ Enviar", use_container_width=True):
+                # TODO: Implementar envio do documento
+                st.info("Funcionalidade de envio em desenvolvimento")
 
 def render_pdd_preview():
     """Renderiza a prévia do PDD."""

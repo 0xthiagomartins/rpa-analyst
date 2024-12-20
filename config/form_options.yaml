@@ -1,0 +1,67 @@
+systems:
+  common_tools:
+    - "SAP"
+    - "Excel"
+    - "Salesforce"
+    - "Oracle"
+    - "Power BI"
+    - "Teams"
+    - "Outlook"
+    - "SharePoint"
+    - "Google Workspace"
+    - "ServiceNow"
+    - "Jira"
+    - "Power Automate"
+
+data_types:
+  - "Dados cadastrais"
+  - "Registros financeiros"
+  - "Dados de vendas"
+  - "Informações de clientes"
+  - "Dados de estoque"
+  - "Relatórios gerenciais"
+  - "Documentos fiscais"
+  - "Planilhas de controle"
+
+common_steps:
+  - "Login no sistema"
+  - "Extração de dados"
+  - "Validação de informações"
+  - "Processamento de dados"
+  - "Envio de e-mail"
+  - "Geração de relatório"
+  - "Atualização de registros"
+  - "Aprovação"
+  - "Arquivamento"
+
+business_rules_templates:
+  - "Se valor > X, requer aprovação"
+  - "Se campo vazio, notificar responsável"
+  - "Se data expirada, bloquear processo"
+  - "Se cliente VIP, tratamento prioritário"
+  - "Se horário fora do expediente, agendar"
+
+common_exceptions:
+  - "Sistema fora do ar"
+  - "Dados incompletos"
+  - "Falha de autenticação"
+  - "Timeout de conexão"
+  - "Arquivo corrompido"
+  - "Formato inválido"
+  - "Permissão negada"
+
+automation_goals:
+  - "Redução de tempo de execução"
+  - "Eliminação de erros manuais"
+  - "Padronização do processo"
+  - "Aumento de produtividade"
+  - "Melhoria na qualidade dos dados"
+  - "Redução de custos operacionais"
+
+kpi_templates:
+  - "Tempo médio de execução"
+  - "Taxa de erros"
+  - "Volume processado"
+  - "Custo por transação"
+  - "Nível de satisfação"
+  - "Tempo de resposta" 

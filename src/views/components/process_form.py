@@ -1,6 +1,16 @@
+import yaml
+from pathlib import Path
 import streamlit as st
 from typing import Callable, Optional, List
 from src.utils.validators import FormValidator
+
+def load_form_options():
+    """Carrega as opções predefinidas do formulário."""
+    config_path = Path(__file__).parent.parent.parent.parent / 'config' / 'form_options.yaml'
+    with open(config_path, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
+
+OPTIONS = load_form_options()
 
 def validate_and_submit(data: dict, required_fields: List[str], on_submit: Callable) -> bool:
     """Valida os dados e submete o formulário se válido."""
@@ -28,21 +38,30 @@ def render_process_identification(on_submit: Optional[Callable] = None, initial_
     initial_data = initial_data or {}
     
     with st.form("identification_form"):
-        process_name = st.text_input(
-            "Nome do processo: *",
-            value=initial_data.get('process_name', ''),
-        )
-        process_owner = st.text_input(
-            "Responsável pelo processo (Owner): *",
-            value=initial_data.get('process_owner', ''),
-        )
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            process_name = st.text_input(
+                "Nome do processo: *",
+                value=initial_data.get('process_name', ''),
+                placeholder="Ex: Processamento de Notas Fiscais"
+            )
+        
+        with col2:
+            process_owner = st.text_input(
+                "Responsável pelo processo (Owner): *",
+                value=initial_data.get('process_owner', ''),
+                placeholder="Ex: João Silva"
+            )
+        
         process_description = st.text_area(
             "Descrição do processo: *",
             value=initial_data.get('process_description', ''),
-            help="Descreva brevemente o objetivo do processo e seu contexto."
+            help="Descreva brevemente o objetivo do processo e seu contexto.",
+            placeholder="Descreva o objetivo e contexto do processo..."
         )
         
-        if st.form_submit_button("Avançar →"):
+        if st.form_submit_button("Avançar →", use_container_width=True):
             data = {
                 "process_name": process_name,
                 "process_owner": process_owner,
@@ -54,85 +73,208 @@ def render_process_identification(on_submit: Optional[Callable] = None, initial_
 
 def render_process_details(on_submit: Optional[Callable] = None, initial_data: dict = None):
     """Renderiza o formulário de detalhes do processo."""
-    if initial_data is None:
-        initial_data = {}
-        
+    initial_data = initial_data or {}
+    
+    # Estado para gerenciar ferramentas customizadas
+    if 'custom_tools' not in st.session_state:
+        st.session_state.custom_tools = []
+    
+    # Área para adicionar nova ferramenta (fora do form)
+    st.write("### Sistemas e Ferramentas")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        new_tool = st.text_input("Adicionar nova ferramenta:", key="new_tool_input")
+    with col2:
+        if st.button("Adicionar", key="add_tool_button"):
+            if new_tool and new_tool not in st.session_state.custom_tools:
+                st.session_state.custom_tools.append(new_tool)
+                st.rerun()
+    
+    # Lista de ferramentas customizadas
+    if st.session_state.custom_tools:
+        st.write("Ferramentas adicionadas:")
+        for tool in st.session_state.custom_tools:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.text(tool)
+            with col2:
+                if st.button("Remover", key=f"remove_{tool}"):
+                    st.session_state.custom_tools.remove(tool)
+                    st.rerun()
+    
+    # Formulário principal
     with st.form("as_is_form"):
-        st.write("Quais são as etapas atuais do processo?")
-        steps = st.text_area(
-            "Passos do Processo (As-Is): *",
-            value=initial_data.get('steps_as_is', ''),
-            help="Liste as etapas na ordem em que ocorrem."
+        st.write("### Etapas do Processo")
+        
+        # Seleção de etapas comuns
+        selected_steps = st.multiselect(
+            "Selecione as etapas que fazem parte do processo:",
+            OPTIONS['common_steps'],
+            default=[]
         )
         
-        systems = st.text_input(
-            "Sistemas / Ferramentas: *",
-            value=initial_data.get('systems', ''),
-            help="Ex: ERP SAP, CRM Salesforce, Excel..."
-        )
-
-        data_used = st.text_area(
-            "Dados utilizados/produzidos: *",
-            value=initial_data.get('data_used', ''),
-            help="Ex: Dados cadastrais, registros de estoque..."
+        # Campo para etapas adicionais
+        custom_steps = st.text_area(
+            "Adicione outras etapas específicas:",
+            value=initial_data.get('custom_steps', ''),
+            help="Digite uma etapa por linha"
         )
         
-        if st.form_submit_button("Salvar detalhes (As-Is)"):
+        st.write("### Sistemas e Ferramentas")
+        
+        # Seleção de ferramentas comuns + customizadas
+        all_tools = OPTIONS['systems']['common_tools'] + st.session_state.custom_tools
+        selected_tools = st.multiselect(
+            "Selecione as ferramentas utilizadas:",
+            all_tools,
+            default=[]
+        )
+        
+        st.write("### Dados Utilizados")
+        
+        # Seleção de tipos de dados comuns
+        selected_data = st.multiselect(
+            "Selecione os tipos de dados:",
+            OPTIONS['data_types'],
+            default=[]
+        )
+        
+        # Campo para outros tipos de dados
+        custom_data = st.text_area(
+            "Especifique outros tipos de dados:",
+            value=initial_data.get('custom_data', ''),
+            help="Digite um tipo por linha"
+        )
+        
+        if st.form_submit_button("Avançar →", use_container_width=True):
+            # Combina etapas selecionadas e customizadas
+            all_steps = selected_steps + [step for step in custom_steps.split('\n') if step.strip()]
+            
+            # Combina dados selecionados e customizados
+            all_data = selected_data + [data for data in custom_data.split('\n') if data.strip()]
+            
             data = {
-                "steps_as_is": steps,
-                "systems": systems,
-                "data_used": data_used
+                "steps_as_is": "\n".join(all_steps),
+                "systems": ", ".join(selected_tools),
+                "data_used": "\n".join(all_data)
             }
-            required_fields = ["steps_as_is", "systems", "data_used"]
-            if validate_and_submit(data, required_fields, on_submit):
-                st.success("Detalhes do processo atual salvos!")
+            
+            # Validação específica para esta seção
+            validator = FormValidator()
+            errors = validator.validate_form(data, 'process_details')
+            
+            if errors:
+                for error in errors:
+                    st.error(error.message)
+            else:
+                if on_submit(data):
+                    st.success("Detalhes do processo salvos com sucesso!")
+                    # Limpa as ferramentas customizadas após salvar
+                    st.session_state.custom_tools = []
 
-def render_business_rules(on_submit: Optional[Callable] = None):
+def render_business_rules(on_submit: Optional[Callable] = None, initial_data: dict = None):
     """Renderiza o formulário de regras de negócio e exceções."""
-    with st.form("rules_exceptions_form"):
-        st.write("Identifique as regras de negócio que governam as decisões dentro do processo.")
-        business_rules = st.text_area(
-            "Regras de Negócio: *",
-            help="Ex: Se valor > X, requer aprovação; Se campo vazio, notificar..."
-        )
-
-        st.write("Quais são as exceções ou condições atípicas que podem ocorrer?")
-        exceptions = st.text_area(
-            "Exceções e Erros Potenciais: *",
-            help="Ex: Sistema fora do ar, dados incompletos, falha de autenticação..."
+    initial_data = initial_data or {}
+    
+    with st.form("rules_form"):
+        st.write("### Regras de Negócio")
+        
+        # Templates de regras comuns
+        selected_rules = st.multiselect(
+            "Selecione as regras aplicáveis:",
+            OPTIONS['business_rules_templates'],
+            default=[]
         )
         
-        submitted = st.form_submit_button("Salvar Regras e Exceções")
-        if submitted:
+        # Editor de regras customizadas
+        st.write("Adicione ou edite regras específicas:")
+        custom_rules = st.text_area(
+            "Regras customizadas",
+            value=initial_data.get('custom_rules', ''),
+            help="Digite uma regra por linha"
+        )
+        
+        st.write("### Exceções e Tratamentos")
+        
+        # Exceções comuns
+        selected_exceptions = st.multiselect(
+            "Selecione as exceções possíveis:",
+            OPTIONS['common_exceptions'],
+            default=[]
+        )
+        
+        # Exceções customizadas
+        custom_exceptions = st.text_area(
+            "Adicione outras exceções específicas:",
+            value=initial_data.get('custom_exceptions', ''),
+            help="Digite uma exceção por linha"
+        )
+        
+        if st.form_submit_button("Avançar →", use_container_width=True):
+            # Combina regras selecionadas e customizadas
+            all_rules = selected_rules + [rule for rule in custom_rules.split('\n') if rule.strip()]
+            
+            # Combina exceções selecionadas e customizadas
+            all_exceptions = selected_exceptions + [exc for exc in custom_exceptions.split('\n') if exc.strip()]
+            
             data = {
-                "business_rules": business_rules,
-                "exceptions": exceptions
+                "business_rules": "\n".join(all_rules),
+                "exceptions": "\n".join(all_exceptions)
             }
+            
             required_fields = ["business_rules", "exceptions"]
             if validate_and_submit(data, required_fields, on_submit):
-                st.success("Regras de negócio e exceções salvas!")
+                st.success("Regras e exceções salvas com sucesso!")
 
-def render_automation_goals(on_submit: Optional[Callable] = None):
+def render_automation_goals(on_submit: Optional[Callable] = None, initial_data: dict = None):
     """Renderiza o formulário de objetivos da automação e KPIs."""
+    initial_data = initial_data or {}
+    
     with st.form("goals_kpis_form"):
-        st.write("O que se espera alcançar com a automação deste processo?")
-        automation_goals = st.text_area(
-            "Objetivos da Automação: *",
-            help="Ex: Reduzir tempo de execução, diminuir erros manuais..."
+        st.write("### Objetivos da Automação")
+        
+        # Seleção de objetivos comuns
+        selected_goals = st.multiselect(
+            "Selecione os objetivos da automação:",
+            OPTIONS['automation_goals'],
+            default=[]
         )
         
-        st.write("Como será medido o sucesso da automação?")
-        kpis = st.text_area(
-            "KPIs/Indicadores de Sucesso: *",
-            help="Ex: Tempo médio de execução, taxa de erros, volume processado..."
+        # Objetivos customizados
+        custom_goals = st.text_area(
+            "Adicione outros objetivos específicos:",
+            value=initial_data.get('custom_goals', ''),
+            help="Digite um objetivo por linha"
         )
         
-        submitted = st.form_submit_button("Salvar Objetivos e KPIs")
-        if submitted:
+        st.write("### KPIs e Métricas")
+        
+        # Seleção de KPIs comuns
+        selected_kpis = st.multiselect(
+            "Selecione os KPIs aplicáveis:",
+            OPTIONS['kpi_templates'],
+            default=[]
+        )
+        
+        # KPIs customizados
+        custom_kpis = st.text_area(
+            "Adicione outros KPIs específicos:",
+            value=initial_data.get('custom_kpis', ''),
+            help="Digite um KPI por linha"
+        )
+        
+        if st.form_submit_button("Finalizar", use_container_width=True):
+            # Combina objetivos selecionados e customizados
+            all_goals = selected_goals + [goal for goal in custom_goals.split('\n') if goal.strip()]
+            
+            # Combina KPIs selecionados e customizados
+            all_kpis = selected_kpis + [kpi for kpi in custom_kpis.split('\n') if kpi.strip()]
+            
             data = {
-                "automation_goals": automation_goals,
-                "kpis": kpis
+                "automation_goals": "\n".join(all_goals),
+                "kpis": "\n".join(all_kpis)
             }
+            
             required_fields = ["automation_goals", "kpis"]
             if validate_and_submit(data, required_fields, on_submit):
-                st.success("Objetivos da automação e KPIs salvos!")
+                st.success("Objetivos e KPIs salvos com sucesso!")
