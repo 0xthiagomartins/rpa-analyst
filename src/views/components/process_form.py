@@ -3,6 +3,7 @@ from pathlib import Path
 import streamlit as st
 from typing import Callable, Optional, List
 from src.utils.validators import FormValidator
+from src.views.components.diagram_editor import render_diagram_editor
 
 def load_form_options():
     """Carrega as opções predefinidas do formulário."""
@@ -171,6 +172,13 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
                     st.success("Detalhes do processo salvos com sucesso!")
                     # Limpa as ferramentas customizadas após salvar
                     st.session_state.custom_tools = []
+    
+    # Após o formulário principal, renderiza o editor de diagrama
+    if st.session_state.get('form_data', {}).get(0):  # Se tiver dados da primeira etapa
+        process_description = st.session_state.form_data[0].get('process_description', '')
+        current_steps = [step for step in custom_steps.split('\n') if step.strip()]
+        
+        render_diagram_editor(process_description, current_steps)
 
 def render_business_rules(on_submit: Optional[Callable] = None, initial_data: dict = None):
     """Renderiza o formulário de regras de negócio e exceções."""
