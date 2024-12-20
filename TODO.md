@@ -31,6 +31,24 @@
   - [ ] Geração automática baseada nos steps
   - [ ] Preview do fluxograma na interface
   - [ ] Exportação do fluxograma em SVG/PNG
+  - [ ] Integração com IA para geração de fluxograma
+    - [ ] Análise de texto dos steps via IA
+    - [ ] Identificação automática de decisões e loops
+    - [ ] Sugestão de conectores e relacionamentos
+    - [ ] Otimização do layout do diagrama
+  - [ ] Editor visual de fluxograma
+    - [ ] Interface drag-and-drop para edição
+    - [ ] Paleta de componentes padrão BPMN
+    - [ ] Validação de conexões e regras
+    - [ ] Histórico de alterações (undo/redo)
+  - [ ] Sincronização bidirecional
+    - [ ] Atualização do texto ao editar diagrama
+    - [ ] Atualização do diagrama ao editar texto
+    - [ ] Resolução de conflitos
+  - [ ] Exportação e compartilhamento
+    - [ ] Múltiplos formatos (PNG, SVG, PDF)
+    - [ ] Integração com ferramentas de modelagem
+    - [ ] Links compartilháveis
 - [ ] Quadrante de precificação
   - [ ] Cálculo automático baseado em complexidade
   - [ ] Fatores de precificação:
@@ -71,6 +89,17 @@
 - [ ] Detecção de padrões em processos
 - [ ] Recomendações de melhorias
 - [ ] Análise de complexidade automática
+- [ ] Geração e edição de fluxogramas
+  - [ ] Modelo de linguagem para análise de texto
+  - [ ] Identificação de entidades e relacionamentos
+  - [ ] Sugestão de melhorias no fluxo
+  - [ ] Detecção de gargalos e redundâncias
+  - [ ] Otimização automática do layout
+  - [ ] Validação semântica do fluxo
+  - [ ] Geração de documentação baseada no fluxo
+  - [ ] Versionamento inteligente de diagramas
+  - [ ] Análise comparativa de versões
+  - [ ] Sugestões de refatoração do processo
 
 ## 💼 Fase J - Módulo Comercial
 - [ ] Geração de propostas comerciais
