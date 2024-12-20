@@ -15,19 +15,23 @@ st.set_page_config(
     layout="wide"
 )
 
-# Inicialização do estado
-if 'app_state' not in st.session_state:
-    st.session_state.app_state = {
-        'step': 0,
-        'controller': ProcessController(),
-        'form_data': {},
-    }
+# Inicialização do estado - versão corrigida
+def init_session_state():
+    """Inicializa o estado da sessão com valores padrão."""
+    if 'step' not in st.session_state:
+        st.session_state.step = 0
+    if 'controller' not in st.session_state:
+        st.session_state.controller = ProcessController()
+    if 'form_data' not in st.session_state:
+        st.session_state.form_data = {}
 
 def get_state(key, default=None):
-    return st.session_state.app_state.get(key, default)
+    """Obtém um valor do estado da sessão."""
+    return getattr(st.session_state, key, default)
 
 def set_state(key, value):
-    st.session_state.app_state[key] = value
+    """Define um valor no estado da sessão."""
+    setattr(st.session_state, key, value)
 
 def handle_form_submit(data: dict):
     """Processa o envio do formulário."""
@@ -161,6 +165,9 @@ def render_pdd_preview():
 
 def main():
     """Função principal da aplicação."""
+    # Inicializa o estado da sessão
+    init_session_state()
+    
     st.title("Agente Analista de RPA")
     st.write("Este agente irá guiá-lo na coleta de informações para criação de um documento PDD.")
     
