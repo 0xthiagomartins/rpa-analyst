@@ -18,29 +18,20 @@
 - [x] Geração de documentos
 - [x] Testes de integração
 
-## 🚧 Fase D - Persistência de Dados
-- [ ] Implementar banco de dados SQLite
-- [ ] Sistema de versionamento de documentos
-- [ ] Backup automático
-- [ ] Testes de persistência
-
-## 📝 Fase E - Interface do Usuário
+## 🚧 Fase D - Interface do Usuário
 - [ ] Melhorar navegação entre etapas
 - [ ] Preview do PDD em tempo real
-- [ ] Sistema de notificações
 - [ ] Feedback visual de validações
 - [ ] Temas claro/escuro
 
-## 🔄 Fase F - Melhorias e Otimizações
-- [ ] Cache de templates
+## 🔄 Fase E - Melhorias e Otimizações
 - [ ] Otimização de performance
 - [ ] Compressão de PDFs
 - [ ] Exportação em outros formatos (DOCX)
 - [ ] Customização de templates
 
-## 🔒 Fase G - Segurança e Deploy
+## 🔒 Fase F - Segurança e Deploy
 - [ ] Validação de entrada de dados
 - [ ] Sanitização de HTML
-- [ ] Sistema de backup
 - [ ] Documentação de deployment
 - [ ] Guia de instalação
