@@ -1,21 +1,44 @@
 # Agente Analista de RPA
 
-Um aplicativo Streamlit para auxiliar na criação de documentos PDD (Process Definition Document) para automação RPA.
+Sistema para geração assistida de documentos PDD (Process Definition Document) para automação RPA.
 
-## Instalação
+## 🚀 Funcionalidades
+
+- ✅ Criação guiada de PDDs
+- ✅ Validação de dados em tempo real
+- ✅ Geração de documentos em HTML e PDF
+- ✅ Interface intuitiva com múltiplas etapas
+- ✅ Sistema de templates customizável
+
+## 🛠️ Tecnologias
+
+- Python 3.8+
+- Streamlit
+- Jinja2
+- PDFKit
+- PyYAML
+- Pytest
+
+## 📋 Pré-requisitos
+
+1. Python 3.8 ou superior
+2. wkhtmltopdf instalado no sistema
+3. Pip (gerenciador de pacotes Python)
+
+## 🔧 Instalação
 
 1. Clone o repositório:
 ```bash
-git clone https://github.com/seu-usuario/agente-analista-rpa.git
-cd agente-analista-rpa
+git clone https://github.com/seu-usuario/analyst.git
+cd analyst
 ```
 
-2. Crie um ambiente virtual e ative-o:
+2. Crie um ambiente virtual:
 ```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
 # ou
-venv\Scripts\activate  # Windows
+.venv\Scripts\activate  # Windows
 ```
 
 3. Instale as dependências:
@@ -23,88 +46,59 @@ venv\Scripts\activate  # Windows
 pip install -r requirements.txt
 ```
 
-## Uso
+4. Instale o wkhtmltopdf:
+- Windows: Baixe e instale de https://wkhtmltopdf.org/downloads.html
+- Linux: `sudo apt-get install wkhtmltopdf`
+- Mac: `brew install wkhtmltopdf`
 
-Execute o aplicativo com:
+## 🚀 Uso
+
+1. Inicie a aplicação:
 ```bash
-streamlit run src/app.py
+python src/run.py
 ```
 
-## Testes
+2. Acesse no navegador:
+```
+http://localhost:8501
+```
 
-Para executar os testes:
+## 🧪 Testes
 
+Execute os testes com:
 ```bash
-# Executa todos os testes com relatório de cobertura
 pytest
-
-# Executa testes com saída detalhada
-pytest -v
-
-# Executa testes de um módulo específico
-pytest tests/test_models/test_process.py
-
-# Gera relatório de cobertura em HTML
-pytest --cov=src --cov-report=html
 ```
 
-O relatório de cobertura HTML será gerado em `htmlcov/index.html`
+Para relatório de cobertura:
+```bash
+pytest --cov=src
+```
 
-## Estrutura do Projeto
+## 📁 Estrutura do Projeto
 
-- `src/`: Código fonte do aplicativo
-  - `controllers/`: Controladores da aplicação
-  - `models/`: Modelos de dados
-  - `views/`: Componentes da interface
-  - `utils/`: Utilitários e helpers
-- `tests/`: Testes automatizados
-  - `conftest.py`: Configurações e fixtures do pytest
-  - `test_models/`: Testes dos modelos
-  - `test_controllers/`: Testes dos controladores
-  - `test_utils/`: Testes dos utilitários
-- `templates/`: Templates para geração de documentos
-- `config/`: Arquivos de configuração
+```
+analyst/
+├── config/             # Configurações
+├── src/               # Código fonte
+│   ├── controllers/   # Controladores
+│   ├── models/        # Modelos
+│   ├── services/      # Serviços
+│   ├── templates/     # Templates
+│   ├── utils/         # Utilitários
+│   └── views/         # Componentes da interface
+├── tests/             # Testes
+└── output/            # PDDs gerados
+```
 
-## Desenvolvimento
+## 📄 Licença
 
-Para contribuir com o projeto:
+Este projeto está sob a licença MIT - veja o arquivo [LICENSE.md](LICENSE.md) para detalhes.
 
-1. Crie uma branch para sua feature
-2. Adicione testes para novas funcionalidades
-3. Garanta que todos os testes passem
-4. Envie um Pull Request
+## 🤝 Contribuindo
 
-## Mapa de Desenvolvimento
-
-1. Fase A - Reestruturação do Projeto ✅
-   - Reorganizar a estrutura de arquivos
-   - Implementar padrão MVC
-   - Criar documentação básica
-   - Adicionar logging
-
-2. Fase B - Melhorias na Interface ✅
-   - Adicionar validação de campos
-   - Melhorar feedback visual
-   - Implementar navegação entre seções
-   - Adicionar progress tracking
-
-3. Fase C - Lógica de Negócios
-   - Implementar classes para gerenciamento de dados
-   - Adicionar validações de regras de negócio
-   - Criar templates customizáveis para o PDD
-   - Implementar versionamento de documentos
-
-4. Fase D - Persistência e Exportação
-   - Adicionar banco de dados
-   - Implementar exportação para diferentes formatos (PDF, DOCX)
-   - Adicionar sistema de templates
-
-5. Fase E - Qualidade e Testes ✅
-   - Implementar testes unitários
-   - Adicionar testes de integração
-   - Implementar CI/CD
-   - Adicionar análise de código
-
-## Licença
-
-MIT
+1. Fork o projeto
+2. Crie sua Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a Branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
