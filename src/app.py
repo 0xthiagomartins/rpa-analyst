@@ -5,6 +5,8 @@ from src.views.components.process_form import (
     render_business_rules,
     render_automation_goals
 )
+from src.services.document_service import DocumentService
+import os
 
 STEPS = {
     0: ("Identificação", render_process_identification),
@@ -56,6 +58,17 @@ def handle_form_submit(data: dict):
         st.session_state.current_step += 1
     return True
 
+def can_generate_pdd() -> bool:
+    """Verifica se todos os dados necessários estão preenchidos."""
+    return len(st.session_state.form_data) == len(STEPS)
+
+def prepare_pdd_data() -> dict:
+    """Prepara os dados para geração do PDD."""
+    data = {}
+    for step_data in st.session_state.form_data.values():
+        data.update(step_data)
+    return data
+
 def render_current_step():
     """Renderiza o formulário da etapa atual."""
     # Título da etapa atual
@@ -73,6 +86,30 @@ def render_current_step():
     # Renderiza o formulário
     initial_data = st.session_state.form_data.get(st.session_state.current_step, {})
     render_form(on_submit=handle_form_submit, initial_data=initial_data)
+    
+    # Botão de geração do PDD
+    if can_generate_pdd():
+        st.divider()
+        st.write("### 📄 Geração do Documento")
+        if st.button("🚀 Gerar PDD", type="primary", use_container_width=True):
+            try:
+                with st.spinner("Gerando documento..."):
+                    doc_service = DocumentService()
+                    pdf_path = doc_service.generate_pdd(prepare_pdd_data())
+                
+                st.success("PDD gerado com sucesso!")
+                
+                # Oferece download do arquivo
+                with open(pdf_path, 'rb') as f:
+                    st.download_button(
+                        label="📥 Download PDD",
+                        data=f.read(),
+                        file_name=os.path.basename(pdf_path),
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+            except Exception as e:
+                st.error(f"Erro ao gerar PDD: {str(e)}")
 
 def main():
     """Função principal da aplicação."""

@@ -1,21 +1,37 @@
-from typing import Optional, Dict, Any
-import pdfkit
+from typing import Dict
+import jinja2
 import os
 from datetime import datetime
-from src.templates.pdd_template import PDDTemplate
-from src.models.process import Process
-import logging
-import platform
-
-logger = logging.getLogger(__name__)
+from weasyprint import HTML
+from src.utils.logger import logger
 
 class DocumentService:
-    """Serviço para geração e gerenciamento de documentos."""
+    """Serviço para geração de documentos PDD."""
+    
+    REQUIRED_FIELDS = [
+        'process_name',
+        'process_owner',
+        'process_description',
+        'steps_as_is',
+        'systems',
+        'data_used',
+        'business_rules',
+        'exceptions',
+        'automation_goals',
+        'kpis'
+    ]
     
     def __init__(self):
-        self.template = PDDTemplate()
+        self.template_env = self._create_template_env()
         self.output_dir = self._ensure_output_dir()
-        self.wkhtmltopdf = self._get_wkhtmltopdf_path()
+    
+    def _create_template_env(self) -> jinja2.Environment:
+        """Cria ambiente Jinja2 para templates."""
+        template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'files')
+        return jinja2.Environment(
+            loader=jinja2.FileSystemLoader(template_path),
+            autoescape=True
+        )
     
     def _ensure_output_dir(self) -> str:
         """Garante que o diretório de saída existe."""
@@ -23,80 +39,44 @@ class DocumentService:
         os.makedirs(output_dir, exist_ok=True)
         return output_dir
     
-    def _get_wkhtmltopdf_path(self) -> Optional[str]:
-        """Retorna o caminho do executável wkhtmltopdf."""
-        if platform.system() == 'Windows':
-            # Caminhos comuns no Windows
-            paths = [
-                r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe',
-                r'C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe',
-            ]
-            for path in paths:
-                if os.path.exists(path):
-                    return path
-        else:
-            # No Linux/Mac, tenta encontrar no PATH
-            try:
-                import subprocess
-                path = subprocess.check_output(['which', 'wkhtmltopdf']).decode().strip()
-                if os.path.exists(path):
-                    return path
-            except:
-                pass
-        return None
+    def _validate_data(self, data: Dict) -> None:
+        """Valida os dados necessários para gerar o PDD."""
+        missing_fields = [field for field in self.REQUIRED_FIELDS if not data.get(field)]
+        if missing_fields:
+            raise ValueError(f"Campos obrigatórios faltando: {', '.join(missing_fields)}")
     
-    def generate_html(self, process: Process) -> str:
-        """Gera o documento HTML do PDD."""
+    def generate_pdd(self, data: Dict) -> str:
+        """Gera o documento PDD em HTML e PDF."""
         try:
-            return self.template.render(process.to_dict())
-        except Exception as e:
-            logger.error(f"Erro ao gerar HTML: {e}")
-            raise ValueError(f"Erro ao gerar documento: {e}")
-    
-    def generate_pdf(self, process: Process) -> str:
-        """Gera o documento PDF do PDD."""
-        if not self.wkhtmltopdf:
-            raise RuntimeError(
-                "wkhtmltopdf não encontrado. Por favor, instale seguindo as instruções em: "
-                "https://wkhtmltopdf.org/downloads.html"
-            )
+            # Valida os dados
+            self._validate_data(data)
             
-        try:
-            html_content = self.generate_html(process)
+            # Carrega o template
+            template = self.template_env.get_template('pdd.html')
+            
+            # Adiciona data de geração
+            data['generated_at'] = datetime.now().strftime("%d/%m/%Y %H:%M")
+            
+            # Gera HTML
+            html_content = template.render(**data)
+            
+            # Define nomes dos arquivos
+            process_name = data['process_name'].replace(' ', '_')
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            safe_name = process.name.replace(' ', '_')
-            filename = f"PDD_{safe_name}_{timestamp}.pdf"
-            output_path = os.path.join(self.output_dir, filename)
+            filename = f"PDD_{process_name}_{timestamp}"
             
-            # Configurações do PDF
-            options = {
-                'page-size': 'A4',
-                'margin-top': '20mm',
-                'margin-right': '20mm',
-                'margin-bottom': '20mm',
-                'margin-left': '20mm',
-                'encoding': 'UTF-8',
-                'no-outline': None
-            }
+            html_path = os.path.join(self.output_dir, f"{filename}.html")
+            pdf_path = os.path.join(self.output_dir, f"{filename}.pdf")
             
-            config = pdfkit.configuration(wkhtmltopdf=self.wkhtmltopdf)
-            pdfkit.from_string(html_content, output_path, options=options, configuration=config)
-            logger.info(f"PDF gerado com sucesso: {output_path}")
-            return output_path
+            # Salva HTML
+            with open(html_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            # Converte para PDF usando WeasyPrint
+            HTML(string=html_content).write_pdf(pdf_path)
+            
+            return pdf_path
             
         except Exception as e:
-            logger.error(f"Erro ao gerar PDF: {e}")
-            raise ValueError(f"Erro ao gerar PDF: {e}")
-    
-    def get_document_path(self, process_name: str) -> Optional[str]:
-        """Retorna o caminho do último documento gerado para um processo."""
-        try:
-            safe_name = process_name.replace(' ', '_')
-            files = [f for f in os.listdir(self.output_dir) 
-                    if f.startswith(f"PDD_{safe_name}_") and f.endswith(".pdf")]
-            if not files:
-                return None
-            return os.path.join(self.output_dir, sorted(files)[-1])
-        except Exception as e:
-            logger.error(f"Erro ao buscar documento: {e}")
-            return None 
+            logger.error(f"Erro ao gerar PDD: {str(e)}")
+            raise ValueError(f"Erro ao gerar documento: {str(e)}") 
