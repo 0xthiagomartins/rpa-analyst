@@ -26,20 +26,7 @@ class AIService:
         self.parser = PydanticOutputParser(pydantic_object=MermaidDiagram)
     
     def generate_diagram(self, process_description: str, steps: List[str]) -> MermaidDiagram:
-        """
-        Gera um diagrama Mermaid baseado na descrição do processo.
-        
-        Args:
-            process_description: Descrição textual do processo
-            steps: Lista de passos do processo
-            
-        Returns:
-            MermaidDiagram: Objeto contendo o código do diagrama e sua explicação
-            
-        Raises:
-            ValueError: Se os inputs forem inválidos ou houver erro de parsing
-            Exception: Se houver erro na geração do diagrama
-        """
+        """Gera um diagrama Mermaid baseado na descrição do processo."""
         # Validação de inputs
         if not process_description or not process_description.strip():
             raise ValueError("A descrição do processo não pode estar vazia")
@@ -54,7 +41,7 @@ class AIService:
             # Prepara os passos formatados
             formatted_steps = "\n".join(f"- {step}" for step in steps)
             
-            # Template sem caracteres especiais que podem causar problemas
+            # Template do prompt
             template = """
             Você é um especialista em criar diagramas de fluxo usando Mermaid.
             Com base na descrição do processo e seus passos, crie um diagrama de fluxo claro e organizado.
@@ -65,35 +52,19 @@ class AIService:
             Passos do Processo:
             {steps}
             
-            Regras para o diagrama:
-            1. Use a sintaxe 'graph TD' para direção top-down
-            2. Identifique decisões usando nós com chaves
-            3. Use cores e ícones apropriados
-            4. Mantenha o diagrama limpo e legível
-            5. Adicione descrições claras para cada nó
-            6. Use setas com rótulos para indicar condições
-            7. Comece cada nó com uma letra maiúscula (A, B, C...)
-            
-            Exemplo:
-            graph TD
-                A[Início] --> B[Decisão]
-                B --> C[Ação 1]
-                B --> D[Ação 2]
-            
             {format_instructions}
             """
             
-            # Cria o prompt com as variáveis corretas
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", template)
-            ])
+            # Cria o prompt
+            prompt = ChatPromptTemplate.from_template(template)
             
+            # Cria a chain
             chain = LLMChain(
                 llm=self.llm,
                 prompt=prompt
             )
             
-            # Executa a chain com os inputs validados
+            # Executa a chain
             try:
                 response = chain.invoke({
                     "description": process_description,
@@ -114,8 +85,8 @@ class AIService:
                 raise ValueError(f"Erro ao processar resposta da API: {str(parse_error)}")
             
         except ValueError as ve:
-            # Propaga erros de validação
+            # Re-raise ValueError exceptions
             raise ve
         except Exception as e:
-            # Converte outros erros em ValueError para manter consistência
+            # Convert other exceptions to ValueError
             raise ValueError(f"Erro ao gerar diagrama: {str(e)}")
