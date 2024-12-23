@@ -30,7 +30,8 @@ def render_diagram_editor(process_description: str, steps: List[str]):
         new_diagram = st.text_area(
             "Código Mermaid:",
             value=st.session_state.current_diagram,
-            height=300
+            height=300,
+            help="Edite o código Mermaid para customizar o fluxograma"
         )
         
         # Preview do diagrama
@@ -40,7 +41,15 @@ def render_diagram_editor(process_description: str, steps: List[str]):
                 # Garante que o diagrama use a sintaxe correta
                 if not any(syntax in new_diagram for syntax in ["flowchart TD", "graph TD"]):
                     new_diagram = new_diagram.replace("graph", "flowchart")
+                
+                # Renderiza o diagrama
                 st_mermaid(new_diagram)
+                
+                # Botão de salvar
+                if st.button("💾 Salvar Alterações"):
+                    st.session_state.current_diagram = new_diagram
+                    st.success("Diagrama atualizado!")
+                
             except Exception as e:
                 st.error(f"Erro ao renderizar diagrama: {str(e)}")
         
@@ -48,15 +57,3 @@ def render_diagram_editor(process_description: str, steps: List[str]):
         if 'diagram_explanation' in st.session_state:
             with st.expander("💡 Explicação do Diagrama", expanded=False):
                 st.write(st.session_state.diagram_explanation)
-        
-        # Botões de ação
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("💾 Salvar Alterações"):
-                st.session_state.current_diagram = new_diagram
-                st.success("Diagrama atualizado!")
-        
-        with col2:
-            if st.button("📥 Exportar"):
-                # TODO: Implementar exportação
-                st.info("Funcionalidade de exportação em desenvolvimento")

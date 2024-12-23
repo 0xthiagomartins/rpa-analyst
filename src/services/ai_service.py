@@ -1,92 +1,94 @@
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import PydanticOutputParser
-from langchain.chains import LLMChain
-from pydantic import BaseModel, Field
+from dataclasses import dataclass
 from typing import List
-import os
-from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain.prompts import ChatPromptTemplate
+from langchain.chains import LLMChain
 
-load_dotenv()
-
-class MermaidDiagram(BaseModel):
-    """Modelo para o diagrama Mermaid."""
-    diagram_code: str = Field(description="Código do diagrama em sintaxe Mermaid")
-    explanation: str = Field(description="Explicação do diagrama gerado")
+@dataclass
+class MermaidDiagram:
+    """Classe para armazenar o diagrama e sua explicação."""
+    diagram_code: str
+    explanation: str
 
 class AIService:
-    """Serviço para geração de diagramas usando IA."""
+    """Serviço para geração de conteúdo usando IA."""
     
     def __init__(self):
         self.llm = ChatOpenAI(
-            model_name="gpt-4",
             temperature=0.7,
-            api_key=os.getenv("OPENAI_API_KEY")
+            model="gpt-3.5-turbo"
         )
-        self.parser = PydanticOutputParser(pydantic_object=MermaidDiagram)
     
     def generate_diagram(self, process_description: str, steps: List[str]) -> MermaidDiagram:
-        """Gera um diagrama Mermaid baseado na descrição do processo."""
-        # Validação de inputs
-        if not process_description or not process_description.strip():
-            raise ValueError("A descrição do processo não pode estar vazia")
+        """Gera um diagrama Mermaid baseado na descrição do processo e seus passos."""
+        if not process_description or not steps:
+            raise ValueError("Descrição do processo e passos são obrigatórios")
+
+        # Template do prompt
+        template = """
+        Você é um especialista em criar diagramas de fluxo usando Mermaid.
+        Crie um diagrama de fluxo que represente o processo descrito abaixo.
+        Use a sintaxe flowchart TD do Mermaid.
         
-        if not steps or not isinstance(steps, list):
-            raise ValueError("Steps deve ser uma lista não vazia")
+        Descrição do Processo:
+        {description}
         
-        if not all(isinstance(step, str) and step.strip() for step in steps):
-            raise ValueError("Todos os steps devem ser strings não vazias")
+        Passos do Processo:
+        {steps}
         
-        try:
-            # Prepara os passos formatados
-            formatted_steps = "\n".join(f"- {step}" for step in steps)
+        Regras para o diagrama:
+        1. Use flowchart TD (top-down)
+        2. Identifique cada nó com IDs únicos (p1, p2, etc)
+        3. Use formas apropriadas para diferentes tipos de ações
+        4. Conecte os nós de forma lógica
+        5. Mantenha o texto em português
+        6. Mantenha o diagrama limpo e legível
+        
+        Retorne apenas:
+        1. O código Mermaid do diagrama
+        2. Uma breve explicação do fluxo
+        
+        Formato da resposta:
+        ```mermaid
+        [código do diagrama aqui]
+        ```
+        
+        Explicação:
+        [explicação aqui]
+        """
+        
+        # Prepara o prompt
+        prompt = ChatPromptTemplate.from_template(template)
+        
+        # Prepara os dados
+        formatted_steps = "\n".join(f"- {step}" for step in steps)
+        
+        # Cria e executa a chain
+        chain = LLMChain(llm=self.llm, prompt=prompt)
+        result = chain.invoke({
+            "description": process_description,
+            "steps": formatted_steps
+        })
+        
+        # Processa a resposta
+        response = result['text']
+        
+        # Extrai o código do diagrama
+        diagram_start = response.find("```mermaid")
+        if diagram_start == -1:
+            raise ValueError("Não foi possível extrair o diagrama da resposta")
             
-            # Template do prompt
-            template = """
-            Você é um especialista em criar diagramas de fluxo usando Mermaid.
-            Com base na descrição do processo e seus passos, crie um diagrama de fluxo claro e organizado.
-            
-            Descrição do Processo:
-            {description}
-            
-            Passos do Processo:
-            {steps}
-            
-            {format_instructions}
-            """
-            
-            # Cria o prompt
-            prompt = ChatPromptTemplate.from_template(template)
-            
-            # Cria a chain
-            chain = LLMChain(
-                llm=self.llm,
-                prompt=prompt
-            )
-            
-            # Executa a chain
-            try:
-                response = chain.invoke({
-                    "description": process_description,
-                    "steps": formatted_steps,
-                    "format_instructions": self.parser.get_format_instructions()
-                })
-            except Exception as e:
-                raise ValueError(f"Erro na chamada da API: {str(e)}")
-            
-            if not response or 'text' not in response:
-                raise ValueError("Resposta inválida da API")
-            
-            # Parse o resultado
-            try:
-                result = self.parser.parse(response['text'])
-                return result
-            except Exception as parse_error:
-                raise ValueError(f"Erro ao processar resposta da API: {str(parse_error)}")
-            
-        except ValueError as ve:
-            # Re-raise ValueError exceptions
-            raise ve
-        except Exception as e:
-            # Convert other exceptions to ValueError
-            raise ValueError(f"Erro ao gerar diagrama: {str(e)}")
+        diagram_end = response.find("```", diagram_start + 10)
+        diagram_code = response[diagram_start + 10:diagram_end].strip()
+        
+        # Extrai a explicação
+        explanation_start = response.find("Explicação:")
+        if explanation_start == -1:
+            explanation = "Sem explicação disponível"
+        else:
+            explanation = response[explanation_start + 11:].strip()
+        
+        return MermaidDiagram(
+            diagram_code=diagram_code,
+            explanation=explanation
+        )
