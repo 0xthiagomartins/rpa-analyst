@@ -1,31 +1,35 @@
-# Agente Analista de RPA
+# Agente Analista de RPA 🤖
 
-Sistema para geração assistida de documentos PDD (Process Definition Document) para automação RPA.
+Uma aplicação web para auxiliar analistas de RPA na criação de documentos PDD (Process Definition Document) de forma inteligente e eficiente.
 
-## 🚀 Funcionalidades
+## 🎯 Funcionalidades
 
-- ✅ Criação guiada de PDDs
-- ✅ Validação de dados em tempo real
-- ✅ Geração de documentos em HTML e PDF
-- ✅ Interface intuitiva com múltiplas etapas
-- ✅ Sistema de templates customizável
+- **Formulários Inteligentes**
+  - Identificação do Processo
+  - Detalhes do Processo
+  - Regras de Negócio
+  - Objetivos da Automação
 
-## 🛠️ Tecnologias
+- **Geração de Diagramas**
+  - Geração automática via IA
+  - Editor visual de diagramas Mermaid
+  - Preview em tempo real
+  - Explicações detalhadas do fluxo
 
-- Python 3.8+
-- Streamlit
-- Jinja2
-- PDFKit
-- PyYAML
-- Pytest
+- **Documentação**
+  - Geração de PDDs em PDF
+  - Layout profissional e padronizado
+  - Exportação automática
 
-## 📋 Pré-requisitos
+## 🚀 Começando
 
-1. Python 3.8 ou superior
-2. wkhtmltopdf instalado no sistema
-3. Pip (gerenciador de pacotes Python)
+### Pré-requisitos
 
-## 🔧 Instalação
+- Python 3.10+
+- pip (gerenciador de pacotes Python)
+- Chave de API da OpenAI
+
+### Instalação
 
 1. Clone o repositório:
 ```bash
@@ -33,12 +37,11 @@ git clone https://github.com/seu-usuario/analyst.git
 cd analyst
 ```
 
-2. Crie um ambiente virtual:
+2. Crie e ative um ambiente virtual:
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Linux/Mac
-# ou
-.venv\Scripts\activate  # Windows
+.venv\Scripts\activate     # Windows
 ```
 
 3. Instale as dependências:
@@ -46,22 +49,19 @@ source .venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 ```
 
-4. Instale o wkhtmltopdf:
-- Windows: Baixe e instale de https://wkhtmltopdf.org/downloads.html
-- Linux: `sudo apt-get install wkhtmltopdf`
-- Mac: `brew install wkhtmltopdf`
+4. Configure as variáveis de ambiente:
+```bash
+cp .env.example .env
+# Edite o arquivo .env com sua chave da OpenAI
+```
 
-## 🚀 Uso
+### Executando
 
-1. Inicie a aplicação:
 ```bash
 python src/run.py
 ```
 
-2. Acesse no navegador:
-```
-http://localhost:8501
-```
+A aplicação estará disponível em `http://localhost:8501`
 
 ## 🧪 Testes
 
@@ -70,30 +70,33 @@ Execute os testes com:
 pytest
 ```
 
-Para relatório de cobertura:
+Para ver a cobertura de testes:
 ```bash
 pytest --cov=src
 ```
 
-## 📁 Estrutura do Projeto
+## 🏗️ Arquitetura
 
-```
-analyst/
-├── config/             # Configurações
-├── src/               # Código fonte
-│   ├── controllers/   # Controladores
-│   ├── models/        # Modelos
-│   ├── services/      # Serviços
-│   ├── templates/     # Templates
-│   ├── utils/         # Utilitários
-│   └── views/         # Componentes da interface
-├── tests/             # Testes
-└── output/            # PDDs gerados
-```
+A aplicação segue uma arquitetura em camadas:
 
-## 📄 Licença
+- **Views**: Interface do usuário usando Streamlit
+- **Services**: Lógica de negócios e integração com IA
+- **Models**: Estruturas de dados e validações
+- **Templates**: Templates para geração de documentos
 
-Este projeto está sob a licença MIT - veja o arquivo [LICENSE.md](LICENSE.md) para detalhes.
+Para mais detalhes, consulte [DIAGRAMS.md](DIAGRAMS.md)
+
+## 🛠️ Tecnologias
+
+- [Streamlit](https://streamlit.io/) - Framework web
+- [LangChain](https://langchain.com/) - Framework de IA
+- [OpenAI GPT](https://openai.com/) - Modelo de linguagem
+- [Mermaid](https://mermaid.js.org/) - Diagramas
+- [ReportLab](https://www.reportlab.com/) - Geração de PDFs
+
+## 📝 Licença
+
+Este projeto está licenciado sob a licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
 
 ## 🤝 Contribuindo
 
@@ -102,3 +105,25 @@ Este projeto está sob a licença MIT - veja o arquivo [LICENSE.md](LICENSE.md) 
 3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
 4. Push para a Branch (`git push origin feature/AmazingFeature`)
 5. Abra um Pull Request
+
+## 📋 Roadmap
+
+- [x] Estrutura básica da aplicação
+- [x] Formulários de entrada
+- [x] Integração com OpenAI
+- [x] Geração de diagramas
+- [x] Geração de PDDs
+- [ ] Persistência de dados
+- [ ] Customização de templates
+- [ ] Exportação em múltiplos formatos
+- [ ] Interface de administração
+
+## 👥 Autores
+
+* **Seu Nome** - *Trabalho inicial* - [seu-usuario](https://github.com/seu-usuario)
+
+## 🙏 Agradecimentos
+
+* OpenAI pela API do GPT
+* Comunidade Streamlit
+* Contribuidores do projeto

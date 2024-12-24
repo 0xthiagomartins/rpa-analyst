@@ -14,12 +14,9 @@ def sample_process_data():
         ]
     }
 
-@patch('langchain_openai.ChatOpenAI')
-def test_generate_diagram(mock_chat, sample_process_data):
-    """Testa a geração de diagrama - caminho feliz e casos de erro."""
-    
-    # Caso 1: Geração bem-sucedida
-    mock_response = """```mermaid
+@pytest.fixture
+def mock_successful_response():
+    return """```mermaid
     flowchart TD
         p1[Funcionário solicita férias] --> p2[Gestor analisa pedido]
         p2 --> p3[RH valida período]
@@ -27,36 +24,46 @@ def test_generate_diagram(mock_chat, sample_process_data):
     ```
     
     Explicação:
-    O fluxo representa o processo de aprovação de férias.
-    """
+    O fluxo representa o processo de aprovação de férias."""
+
+def test_generate_diagram_empty_input():
+    """Testa a geração de diagrama com inputs vazios."""
+    service = AIService()
     
-    mock_chain = Mock()
-    mock_chain.invoke.return_value = {'text': mock_response}
+    with pytest.raises(ValueError, match="Descrição do processo e passos são obrigatórios"):
+        service.generate_diagram("", [])
+
+@patch('langchain.chains.LLMChain')
+@patch('langchain_openai.ChatOpenAI')
+def test_generate_diagram_success(mock_chat, mock_chain, sample_process_data, mock_successful_response):
+    """Testa a geração bem-sucedida de diagrama."""
+    # Configura o mock da chain
+    chain_instance = Mock()
+    chain_instance.invoke.return_value = {'text': mock_successful_response}
+    mock_chain.return_value = chain_instance
     
-    with patch('langchain.chains.LLMChain', Mock(return_value=mock_chain)):
-        service = AIService()
-        
-        # Testa inputs inválidos
-        with pytest.raises(ValueError):
-            service.generate_diagram("", [])
-        
-        with pytest.raises(ValueError):
-            service.generate_diagram("descrição", [])
-        
-        # Testa geração bem-sucedida
-        result = service.generate_diagram(
+    service = AIService()
+    result = service.generate_diagram(
+        sample_process_data['description'],
+        sample_process_data['steps']
+    )
+    
+    assert isinstance(result, MermaidDiagram)
+    assert "flowchart TD" in result.diagram_code
+    assert len(result.explanation) > 0
+
+@patch('langchain.chains.LLMChain')
+@patch('langchain_openai.ChatOpenAI')
+def test_generate_diagram_invalid_response(mock_chat, mock_chain, sample_process_data):
+    """Testa a geração de diagrama com resposta inválida da IA."""
+    # Configura o mock da chain
+    chain_instance = Mock()
+    chain_instance.invoke.return_value = {'text': 'Resposta inválida sem diagrama'}
+    mock_chain.return_value = chain_instance
+    
+    service = AIService()
+    with pytest.raises(ValueError, match="Não foi possível extrair o diagrama da resposta"):
+        service.generate_diagram(
             sample_process_data['description'],
             sample_process_data['steps']
         )
-        
-        assert isinstance(result, MermaidDiagram)
-        assert "flowchart TD" in result.diagram_code
-        assert len(result.explanation) > 0
-        
-        # Testa resposta inválida da IA
-        mock_chain.invoke.return_value = {'text': 'Resposta inválida'}
-        with pytest.raises(ValueError):
-            service.generate_diagram(
-                sample_process_data['description'],
-                sample_process_data['steps']
-            )
