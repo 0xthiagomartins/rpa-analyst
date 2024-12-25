@@ -9,26 +9,39 @@ from src.services.document_service import DocumentService
 import os
 
 STEPS = {
-    0: ("Identificação", render_process_identification),
-    1: ("Detalhes do Processo", render_process_details),
-    2: ("Regras de Negócio", render_business_rules),
-    3: ("Objetivos da Automação", render_automation_goals)
+    "identification": ("Identificação do Processo", render_process_identification),
+    "details": ("Detalhes do Processo", render_process_details),
+    "business_rules": ("Regras de Negócio", render_business_rules),
+    "automation_goals": ("Objetivos e KPIs", render_automation_goals)
 }
 
 def init_session_state():
     """Inicializa o estado da sessão."""
     if 'current_step' not in st.session_state:
-        st.session_state.current_step = 0
+        st.session_state.current_step = "identification"
     if 'form_data' not in st.session_state:
         st.session_state.form_data = {}
 
 def calculate_progress():
-    """Calcula o progresso baseado nos dados preenchidos."""
+    """Calcula o progresso baseado na posição atual e dados preenchidos."""
     if not st.session_state.form_data:
         return 0.0
     
-    steps_completed = len(st.session_state.form_data)
-    return min(steps_completed / len(STEPS), 1.0)
+    # Define a ordem dos steps
+    step_order = ["identification", "details", "business_rules", "automation_goals"]
+    current_index = step_order.index(st.session_state.current_step)
+    
+    # Conta steps preenchidos até o atual
+    completed_steps = sum(1 for step in step_order[:current_index + 1] 
+                         if step in st.session_state.form_data)
+    
+    # Calcula progresso baseado na posição atual
+    total_steps = len(step_order)
+    base_progress = (current_index + 1) / total_steps
+    completion_progress = completed_steps / total_steps
+    
+    # Retorna o menor valor entre a posição atual e os steps completados
+    return min(base_progress, completion_progress)
 
 def render_navigation():
     """Renderiza a navegação entre etapas e barra de progresso."""
@@ -37,79 +50,151 @@ def render_navigation():
     st.progress(progress)
     
     # Indicador de progresso em texto
-    progress_text = f"Progresso: {int(progress * 100)}%"
+    current_step = list(STEPS.keys()).index(st.session_state.current_step) + 1
+    total_steps = len(STEPS)
+    progress_text = f"Etapa {current_step} de {total_steps}"
     st.caption(progress_text)
     
-    # Navegação
-    cols = st.columns(len(STEPS))
-    for idx, (title, _) in STEPS.items():
+    # Navegação visual (sem botões)
+    steps = list(STEPS.items())
+    cols = st.columns(len(steps))
+    for idx, (step_key, (title, _)) in enumerate(steps):
         with cols[idx]:
-            if idx == st.session_state.current_step:
-                st.markdown(f"**➡️ {title}**")
-            elif idx in st.session_state.form_data:
+            if step_key == st.session_state.current_step:
+                st.markdown(f"**✏️ {title}**")
+            elif step_key in st.session_state.form_data:
                 st.markdown(f"✅ {title}")
             else:
                 st.markdown(f"⭕ {title}")
 
+def render_step_navigation():
+    """Renderiza botões de navegação entre steps."""
+    step_order = ["identification", "details", "business_rules", "automation_goals"]
+    current_index = step_order.index(st.session_state.current_step)
+    
+    # Layout com 2 colunas para os botões de navegação
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        # Botão Voltar
+        if current_index > 0:
+            if st.button("← Voltar", 
+                        key="btn_step_back",
+                        use_container_width=True):
+                st.session_state.current_step = step_order[current_index - 1]
+                st.rerun()
+    
+    with col2:
+        # Botão Avançar (habilitado apenas se o step atual estiver salvo)
+        if current_index < len(step_order) - 1:
+            next_disabled = st.session_state.current_step not in st.session_state.form_data
+            if st.button("Avançar →", 
+                        key="btn_step_next",
+                        disabled=next_disabled,
+                        type="primary",
+                        use_container_width=True):
+                st.session_state.current_step = step_order[current_index + 1]
+                st.rerun()
+            
+            # Mostra mensagem se o botão estiver desabilitado
+            if next_disabled:
+                st.caption("💡 Salve os dados para avançar")
+
 def handle_form_submit(data: dict):
     """Manipula o envio do formulário."""
+    # Salva os dados do passo atual
     st.session_state.form_data[st.session_state.current_step] = data
-    if st.session_state.current_step < len(STEPS) - 1:
-        st.session_state.current_step += 1
-    return True
+    return True  # Removido o avanço automático
 
 def can_generate_pdd() -> bool:
     """Verifica se todos os dados necessários estão preenchidos."""
-    return len(st.session_state.form_data) == len(STEPS)
+    required_steps = ["identification", "details", "business_rules", "automation_goals"]
+    return all(step in st.session_state.form_data for step in required_steps)
 
 def prepare_pdd_data() -> dict:
     """Prepara os dados para geração do PDD."""
-    data = {}
-    for step_data in st.session_state.form_data.values():
-        data.update(step_data)
-    return data
+    form_data = st.session_state.form_data
+    
+    # Mapeia os dados do formulário para o formato esperado pelo DocumentService
+    pdd_data = {
+        # Dados de identificação
+        "process_name": form_data["identification"].get("process_name", ""),
+        "process_owner": form_data["identification"].get("process_owner", ""),
+        "process_description": form_data["identification"].get("process_description", ""),
+        
+        # Dados de detalhes do processo
+        "steps_as_is": form_data["details"].get("steps", []),
+        "systems": form_data["details"].get("tools", []),
+        "data_used": {
+            "types": form_data["details"].get("data_types", []),
+            "formats": form_data["details"].get("data_formats", []),
+            "sources": form_data["details"].get("data_sources", []),
+            "volume": form_data["details"].get("data_volume", "Médio")
+        },
+        
+        # Regras de negócio e exceções
+        "business_rules": form_data["business_rules"].get("business_rules", []),
+        "exceptions": form_data["business_rules"].get("exceptions", []),
+        
+        # Objetivos e KPIs
+        "automation_goals": form_data["automation_goals"].get("automation_goals", ""),
+        "kpis": form_data["automation_goals"].get("kpis", "")
+    }
+    
+    return pdd_data
 
 def render_current_step():
-    """Renderiza o formulário da etapa atual."""
-    # Título da etapa atual
+    """Renderiza o passo atual do formulário."""
+    # Inicializa o estado se necessário
+    if 'current_step' not in st.session_state:
+        st.session_state.current_step = "identification"
+    
+    # Carrega dados iniciais se existirem
+    initial_data = {}
+    if 'form_data' in st.session_state:
+        initial_data = st.session_state.form_data.get(st.session_state.current_step, {})
+    
+    # Renderiza o título do passo atual
     current_title, render_form = STEPS[st.session_state.current_step]
     st.header(current_title)
     
-    # Botões de navegação
-    col1, col2 = st.columns([1, 5])
-    with col1:
-        if st.session_state.current_step > 0:
-            if st.button("← Voltar"):
-                st.session_state.current_step -= 1
-                st.rerun()
-    
-    # Renderiza o formulário
-    initial_data = st.session_state.form_data.get(st.session_state.current_step, {})
+    # Renderiza o formulário do passo atual
     render_form(on_submit=handle_form_submit, initial_data=initial_data)
     
-    # Botão de geração do PDD
-    if can_generate_pdd():
+    # Renderiza navegação entre steps
+    st.divider()
+    render_step_navigation()
+    
+    # Botão de geração do PDD (apenas no último passo)
+    if st.session_state.current_step == "automation_goals" and can_generate_pdd():
         st.divider()
         st.write("### 📄 Geração do Documento")
-        if st.button("🚀 Gerar PDD", type="primary", use_container_width=True):
-            try:
-                with st.spinner("Gerando documento..."):
-                    doc_service = DocumentService()
-                    pdf_path = doc_service.generate_pdd(prepare_pdd_data())
-                
-                st.success("PDD gerado com sucesso!")
-                
-                # Oferece download do arquivo
-                with open(pdf_path, 'rb') as f:
-                    st.download_button(
-                        label="📥 Download PDD",
-                        data=f.read(),
-                        file_name=os.path.basename(pdf_path),
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
-            except Exception as e:
-                st.error(f"Erro ao gerar PDD: {str(e)}")
+        
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            if st.button("🚀 Gerar PDD", 
+                        type="primary", 
+                        use_container_width=True,
+                        key="btn_generate_pdd"):
+                try:
+                    with st.spinner("Gerando documento..."):
+                        doc_service = DocumentService()
+                        pdf_path = doc_service.generate_pdd(prepare_pdd_data())
+                    
+                    st.success("PDD gerado com sucesso!")
+                    
+                    # Oferece download do arquivo
+                    with open(pdf_path, 'rb') as f:
+                        st.download_button(
+                            label="📥 Download PDD",
+                            data=f.read(),
+                            file_name=os.path.basename(pdf_path),
+                            mime="application/pdf",
+                            use_container_width=True,
+                            key="btn_download_pdd"
+                        )
+                except Exception as e:
+                    st.error(f"Erro ao gerar PDD: {str(e)}")
 
 def main():
     """Função principal da aplicação."""

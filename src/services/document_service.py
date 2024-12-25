@@ -51,30 +51,56 @@ class DocumentService:
             spaceAfter=10
         ))
     
-    def _validate_data(self, data: Dict) -> None:
+    def validate_pdd_data(self, data: dict) -> bool:
         """Valida os dados necessários para gerar o PDD."""
-        missing_fields = [field for field in self.REQUIRED_FIELDS if not data.get(field)]
+        required_fields = [
+            "process_name",
+            "process_owner",
+            "process_description",
+            "steps_as_is",
+            "systems",
+            "data_used",
+            "business_rules",
+            "exceptions",
+            "automation_goals",
+            "kpis"
+        ]
+        
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        
         if missing_fields:
             raise ValueError(f"Campos obrigatórios faltando: {', '.join(missing_fields)}")
+        
+        return True
     
-    def _create_field(self, label: str, value: str) -> Table:
+    def _format_value(self, value) -> str:
+        """Formata um valor para exibição no PDF."""
+        if isinstance(value, list):
+            return "\n• " + "\n• ".join(str(item) for item in value)
+        elif isinstance(value, dict):
+            return "\n".join(f"{k}: {self._format_value(v)}" for k, v in value.items())
+        return str(value)
+    
+    def _create_field(self, label: str, value) -> Table:
         """Cria uma tabela para um campo do documento."""
+        formatted_value = self._format_value(value)
         return Table(
             [[Paragraph(label, self.styles['Heading4']), 
-              Paragraph(value, self.styles['Normal'])]],
+              Paragraph(formatted_value, self.styles['Normal'])]],
             colWidths=[150, 350],
             style=TableStyle([
                 ('GRID', (0, 0), (-1, -1), 1, colors.grey),
                 ('BACKGROUND', (0, 0), (0, 0), colors.lightgrey),
                 ('PADDING', (0, 0), (-1, -1), 6),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),  # Alinha texto ao topo
             ])
         )
     
-    def generate_pdd(self, data: Dict) -> str:
+    def generate_pdd(self, data: dict) -> str:
         """Gera o documento PDD em PDF."""
         try:
             # Valida os dados
-            self._validate_data(data)
+            self.validate_pdd_data(data)
             
             # Define nome do arquivo
             process_name = data['process_name'].replace(' ', '_')
