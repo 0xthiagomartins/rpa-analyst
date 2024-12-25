@@ -3,6 +3,10 @@ from typing import List
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain
+import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class MermaidDiagram:
@@ -231,3 +235,57 @@ class AIService:
             return response
         except Exception as e:
             raise ValueError(f"Erro ao processar resposta da IA: {str(e)}")
+
+    def analyze_process_description(self, description: str) -> dict:
+        """Analisa a descrição do processo e sugere valores para todos os campos."""
+        template = """
+        Você é um especialista em análise de processos para automação RPA.
+        Analise a seguinte descrição de processo e extraia informações relevantes para automação RPA.
+        Você pode sugerir tanto itens padrão quanto customizados que identificar na descrição.
+
+        Descrição: {description}
+
+        Por favor, identifique e retorne no formato JSON:
+        1. Etapas do processo (steps) - Liste todas as etapas identificadas, mesmo que não sejam comuns
+        2. Sistemas e ferramentas envolvidos (tools) - Liste todos os sistemas/ferramentas mencionados
+        3. Tipos de dados manipulados (data_types)
+        4. Formatos de arquivos (data_formats)
+        5. Origens dos dados (data_sources)
+        6. Volume estimado de dados (data_volume: "Baixo", "Médio", "Alto", "Muito Alto")
+        7. Regras de negócio identificadas (business_rules)
+        8. Possíveis exceções (exceptions)
+        9. Objetivos da automação (automation_goals)
+        10. KPIs sugeridos (kpis)
+
+        Seja específico e detalhado nas sugestões, não se limite apenas a termos genéricos.
+        """
+
+        try:
+            # Usa o LangChain em vez do client direto
+            prompt = ChatPromptTemplate.from_template(template)
+            chain = LLMChain(llm=self.llm, prompt=prompt)
+            result = chain.invoke({"description": description})
+            
+            # Processa e valida a resposta
+            suggestions = json.loads(result['text'])
+            return {
+                'details': {
+                    'steps': suggestions.get('steps', []),
+                    'tools': suggestions.get('tools', []),
+                    'data_types': suggestions.get('data_types', []),
+                    'data_formats': suggestions.get('data_formats', []),
+                    'data_sources': suggestions.get('data_sources', []),
+                    'data_volume': suggestions.get('data_volume', 'Médio')
+                },
+                'business_rules': {
+                    'business_rules': suggestions.get('business_rules', []),
+                    'exceptions': suggestions.get('exceptions', [])
+                },
+                'automation_goals': {
+                    'automation_goals': suggestions.get('automation_goals', []),
+                    'kpis': suggestions.get('kpis', [])
+                }
+            }
+        except Exception as e:
+            logger.error(f"Erro ao analisar descrição: {str(e)}")
+            raise ValueError(f"Erro ao analisar descrição: {str(e)}")

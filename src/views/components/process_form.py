@@ -148,6 +148,101 @@ def render_process_identification(on_submit: Optional[Callable] = None, initial_
         }
         required_fields = ["process_name", "process_owner", "process_description"]
         if validate_and_submit(data, required_fields, on_submit):
+            # Analisa a descrição e sugere valores
+            try:
+                with st.spinner("Analisando descrição..."):
+                    ai_service = AIService()
+                    suggestions = ai_service.analyze_process_description(description)
+                    
+                    # Armazena sugestões no estado da sessão
+                    if 'ai_suggestions' not in st.session_state:
+                        st.session_state.ai_suggestions = {}
+                    
+                    st.session_state.ai_suggestions = suggestions
+                    
+                    # Mostra preview das sugestões
+                    with st.expander("🤖 Sugestões da IA", expanded=True):
+                        st.info("Com base na descrição, foram identificados os seguintes elementos:")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write("**Etapas Identificadas:**")
+                            for step in suggestions['details']['steps']:
+                                st.write(f"• {step}")
+                            
+                            st.write("**Sistemas/Ferramentas:**")
+                            for tool in suggestions['details']['tools']:
+                                st.write(f"• {tool}")
+                        
+                        with col2:
+                            st.write("**Regras de Negócio:**")
+                            for rule in suggestions['business_rules']['business_rules']:
+                                st.write(f"• {rule}")
+                            
+                            st.write("**Objetivos:**")
+                            for goal in suggestions['automation_goals']['automation_goals']:
+                                st.write(f"• {goal}")
+                        
+                        # Botões para aceitar/rejeitar sugestões
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("✅ Usar Sugestões", use_container_width=True):
+                                # Ajusta os dados para o formato esperado pelos formulários
+                                details_data = {
+                                    'steps': suggestions['details']['steps'],
+                                    'tools': suggestions['details']['tools'],
+                                    'data_types': suggestions['details']['data_types'],
+                                    'data_formats': suggestions['details']['data_formats'],
+                                    'data_sources': suggestions['details']['data_sources'],
+                                    'data_volume': suggestions['details']['data_volume']
+                                }
+                                
+                                business_rules_data = {
+                                    'business_rules': suggestions['business_rules']['business_rules'],
+                                    'exceptions': suggestions['business_rules']['exceptions']
+                                }
+                                
+                                automation_goals_data = {
+                                    'automation_goals': suggestions['automation_goals']['automation_goals'],
+                                    'kpis': suggestions['automation_goals']['kpis']
+                                }
+                                
+                                # Atualiza o estado da sessão com os dados formatados
+                                if 'form_data' not in st.session_state:
+                                    st.session_state.form_data = {}
+                                
+                                st.session_state.form_data.update({
+                                    'details': details_data,
+                                    'business_rules': business_rules_data,
+                                    'automation_goals': automation_goals_data
+                                })
+                                
+                                # Atualiza os estados específicos dos formulários
+                                st.session_state.process_details = {
+                                    'custom_tools': [],
+                                    'custom_steps': [],
+                                    'selected_tab': 'steps',
+                                    'saved_steps': details_data['steps'],
+                                    'saved_tools': details_data['tools']
+                                }
+                                
+                                st.session_state.business_rules = {
+                                    'selected_rules': business_rules_data['business_rules'],
+                                    'custom_rules': '',
+                                    'selected_exceptions': business_rules_data['exceptions'],
+                                    'custom_exceptions': ''
+                                }
+                                
+                                st.success("Sugestões aplicadas! Você pode revisar e ajustar nos próximos passos.")
+                                st.rerun()  # Força atualização da interface
+                        with col2:
+                            if st.button("❌ Ignorar Sugestões", use_container_width=True):
+                                st.session_state.ai_suggestions = {}
+                                st.info("Sugestões ignoradas. Continue o preenchimento normalmente.")
+                
+            except Exception as e:
+                st.error(f"Erro ao analisar descrição: {str(e)}")
+            
             st.success("Informações salvas com sucesso!")
 
 def render_process_details(on_submit: Optional[Callable] = None, initial_data: dict = None):
@@ -159,10 +254,36 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
     # Inicializa estados se necessário
     if 'process_details' not in st.session_state:
         st.session_state.process_details = {
-            'custom_tools': initial_data.get('tools', []),
-            'custom_steps': initial_data.get('steps', []),
-            'selected_tab': 'steps'
+            'custom_tools': [],
+            'custom_steps': [],
+            'selected_tab': 'steps',
+            'saved_steps': [],
+            'saved_tools': []
         }
+    
+    # Processa as sugestões da IA
+    if initial_data:
+        suggested_steps = initial_data.get('steps', [])
+        suggested_tools = initial_data.get('tools', [])
+        
+        # Separa os steps em padrão e customizado
+        standard_steps = [step for step in suggested_steps if step in OPTIONS['common_steps']]
+        custom_steps = [step for step in suggested_steps if step not in OPTIONS['common_steps']]
+        
+        # Separa as ferramentas em padrão e customizado
+        all_standard_tools = [tool for tools in OPTIONS['systems'].values() if isinstance(tools, list) for tool in tools]
+        standard_tools = [tool for tool in suggested_tools if tool in all_standard_tools]
+        custom_tools = [{'name': tool, 'type': 'Outro'} 
+                       for tool in suggested_tools 
+                       if tool not in all_standard_tools]
+        
+        # Atualiza o estado com as sugestões
+        st.session_state.process_details.update({
+            'custom_steps': custom_steps,
+            'custom_tools': custom_tools,
+            'saved_steps': standard_steps,
+            'saved_tools': standard_tools
+        })
     
     # Tabs para organizar as seções
     tab_steps, tab_tools, tab_data = st.tabs([
@@ -194,30 +315,69 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
                     st.session_state.process_details['custom_steps'].append(new_step)
                     st.rerun()
     
+    with tab_tools:
+        st.write("### Sistemas e Ferramentas")
+        # Botões de adicionar/remover ferramentas customizadas
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.write("**Ferramentas Customizadas**")
+            for tool in st.session_state.process_details['custom_tools']:
+                col_a, col_b = st.columns([3, 1])
+                with col_a:
+                    st.info(f"{tool['name']} ({tool['type']})")
+                with col_b:
+                    if st.button("🗑️", key=f"btn_remove_tool_{tool['name']}"):
+                        st.session_state.process_details['custom_tools'].remove(tool)
+                        st.rerun()
+        
+        with col2:
+            st.write("**Adicionar Nova Ferramenta**")
+            new_tool = st.text_input("", placeholder="Nome da ferramenta", key="new_tool")
+            tool_type = st.selectbox(
+                "",
+                ["Sistema", "Aplicativo", "Website", "API", "Outro"],
+                key="new_tool_type"
+            )
+            if st.button("➕ Adicionar", key=f"btn_add_tool_{new_tool}"):
+                if new_tool and not any(t['name'] == new_tool for t in st.session_state.process_details['custom_tools']):
+                    st.session_state.process_details['custom_tools'].append({
+                        'name': new_tool,
+                        'type': tool_type
+                    })
+                    st.rerun()
+    
     # Formulário principal
     with st.form("details_form", clear_on_submit=False):
         with tab_steps:
-            # Etapas comuns em formato de checkbox
             st.write("**Etapas Comuns**")
             selected_steps = []
-            saved_steps = initial_data.get('steps', [])
+            
+            # Mostra checkboxes para etapas comuns
             for step in OPTIONS['common_steps']:
                 if st.checkbox(step, 
                              key=f"step_{step}",
-                             value=step in saved_steps):  # Define o valor inicial do checkbox
+                             value=step in st.session_state.process_details['saved_steps']):
                     selected_steps.append(step)
+            
+            # Adiciona etapas customizadas já salvas
+            selected_steps.extend(st.session_state.process_details['custom_steps'])
         
         with tab_tools:
-            st.write("### Sistemas e Ferramentas")
-            # Sistemas comuns
-            st.write("**Sistemas Comuns**")
+            st.write("**Sistemas e Ferramentas Comuns**")
             selected_systems = []
-            saved_tools = initial_data.get('tools', [])
-            for system in OPTIONS['systems']['common_tools']:
-                if st.checkbox(system, 
-                             key=f"system_{system}",
-                             value=system in saved_tools):  # Define o valor inicial do checkbox
-                    selected_systems.append(system)
+            
+            # Agrupa ferramentas por categoria
+            for category, tools in OPTIONS['systems'].items():
+                if isinstance(tools, list):  # Ignora campos que não são listas
+                    st.write(f"**{category.replace('_', ' ').title()}:**")
+                    for system in tools:
+                        if st.checkbox(system, 
+                                     key=f"system_{system}",
+                                     value=system in st.session_state.process_details['saved_tools']):
+                            selected_systems.append(system)
+            
+            # Adiciona ferramentas customizadas já salvas
+            selected_systems.extend([t['name'] for t in st.session_state.process_details['custom_tools']])
         
         with tab_data:
             st.write("### Dados do Processo")
