@@ -117,11 +117,11 @@ Este projeto está licenciado sob a licença MIT - veja o arquivo [LICENSE](LICE
 - [ ] Customização de templates
 - [ ] Exportação em múltiplos formatos
 - [ ] Interface de administração
-- [ ] Assistente de Formalização
-  - [ ] Botão "Formalizar" para descrições informais
-  - [ ] Preview da versão formalizada
-  - [ ] Sistema de aprovação/edição da formalização
-  - [ ] Histórico de versões da descrição
+- [x] Assistente de Formalização
+  - [x] Botão "Formalizar" para descrições informais
+  - [x] Preview da versão formalizada
+  - [x] Sistema de aprovação/edição da formalização
+  - [x] Histórico de versões da descrição
 - [ ] Auto-preenchimento Inteligente
   - [ ] Inferência de sistemas e ferramentas a partir da descrição
   - [ ] Sugestão de regras de negócio baseadas no contexto

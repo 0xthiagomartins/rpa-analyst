@@ -188,3 +188,46 @@ class AIService:
             diagram_code=diagram_code,
             explanation=explanation
         )
+
+    def formalize_description(self, informal_description: str) -> dict:
+        """Formaliza uma descrição informal do processo."""
+        if not informal_description:
+            raise ValueError("A descrição não pode estar vazia")
+        
+        template = """
+        Você é um especialista em documentação técnica de processos RPA.
+        Transforme a descrição informal abaixo em uma descrição técnica profissional.
+        
+        Descrição Informal:
+        {description}
+        
+        Regras para formalização:
+        1. Use linguagem técnica apropriada
+        2. Mantenha a clareza e objetividade
+        3. Estruture em parágrafos lógicos
+        4. Preserve informações importantes
+        5. Remova coloquialismos
+        
+        Retorne a resposta no seguinte formato JSON:
+        {{
+            "formal_description": "descrição formalizada aqui",
+            "changes_made": ["lista de principais alterações feitas"],
+            "technical_terms": ["termos técnicos identificados/adicionados"]
+        }}
+        """
+        
+        prompt = ChatPromptTemplate.from_template(template)
+        chain = LLMChain(llm=self.llm, prompt=prompt)
+        
+        result = chain.invoke({"description": informal_description})
+        
+        # Processa e valida a resposta
+        try:
+            import json
+            response = json.loads(result['text'].strip())
+            required_keys = ["formal_description", "changes_made", "technical_terms"]
+            if not all(key in response for key in required_keys):
+                raise ValueError("Resposta da IA incompleta")
+            return response
+        except Exception as e:
+            raise ValueError(f"Erro ao processar resposta da IA: {str(e)}")

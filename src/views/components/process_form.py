@@ -4,6 +4,9 @@ import streamlit as st
 from typing import Callable, Optional, List
 from src.utils.validators import FormValidator
 from src.views.components.diagram_editor import render_diagram_editor
+from .description_formalizer import render_description_formalizer
+from src.services.ai_service import AIService
+from streamlit_modal import Modal
 
 def load_form_options():
     """Carrega as opções predefinidas do formulário."""
@@ -38,7 +41,16 @@ def render_process_identification(on_submit: Optional[Callable] = None, initial_
     """Renderiza o formulário de identificação do processo."""
     initial_data = initial_data or {}
     
-    with st.form("identification_form"):
+    # Inicializa o estado se necessário
+    if 'process_form' not in st.session_state:
+        st.session_state.process_form = {
+            'description': initial_data.get('description', ''),
+            'formalized_text': None,
+            'show_formalization': False
+        }
+    
+    # Formulário principal
+    with st.form("identification_form", clear_on_submit=False):
         col1, col2 = st.columns([2, 1])
         
         with col1:
@@ -55,22 +67,86 @@ def render_process_identification(on_submit: Optional[Callable] = None, initial_
                 placeholder="Ex: João Silva"
             )
         
-        process_description = st.text_area(
-            "Descrição do processo: *",
-            value=initial_data.get('process_description', ''),
-            help="Descreva brevemente o objetivo do processo e seu contexto.",
-            placeholder="Descreva o objetivo e contexto do processo..."
+        # Campo de descrição único
+        description = st.text_area(
+            "Descrição do Processo",
+            value=st.session_state.process_form['description'],
+            help="Descreva o processo de forma detalhada",
+            height=150,
+            key="process_description"
         )
         
-        if st.form_submit_button("Avançar →", use_container_width=True):
-            data = {
-                "process_name": process_name,
-                "process_owner": process_owner,
-                "process_description": process_description
-            }
-            required_fields = ["process_name", "process_owner", "process_description"]
-            if validate_and_submit(data, required_fields, on_submit):
-                st.success("Informações salvas com sucesso!")
+        # Botões em colunas
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            formalize = st.form_submit_button(
+                "🎩 Formalizar",
+                use_container_width=True
+            )
+        with col2:
+            submit = st.form_submit_button(
+                "Avançar →",
+                use_container_width=True,
+                type="primary"
+            )
+    
+    # Lógica de formalização
+    if formalize and description:
+        with st.spinner("Formalizando descrição..."):
+            try:
+                ai_service = AIService()
+                result = ai_service.formalize_description(description)
+                st.session_state.process_form['formalized_text'] = result
+                st.session_state.process_form['show_formalization'] = True
+                
+            except Exception as e:
+                st.error(f"Erro ao formalizar descrição: {str(e)}")
+    
+    # Mostra a formalização se necessário
+    if st.session_state.process_form['show_formalization']:
+        with st.expander("🔄 Confirmar Formalização", expanded=True):
+            formalized = st.session_state.process_form['formalized_text']['formal_description']
+            
+            # Comparação das versões
+            st.write("#### Comparação das Versões")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.info("**Original:**\n" + description)
+            with col2:
+                st.success("**Formalizada:**\n" + formalized)
+            
+            # Detalhes
+            st.write("**Principais Mudanças:**")
+            for change in st.session_state.process_form['formalized_text']['changes_made']:
+                st.write(f"- {change}")
+            
+            st.write("**Termos Técnicos:**")
+            st.write(", ".join(st.session_state.process_form['formalized_text']['technical_terms']))
+            
+            # Botões de ação
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Usar Versão Formalizada", use_container_width=True):
+                    st.session_state.process_form['description'] = formalized
+                    st.session_state.process_form['show_formalization'] = False
+                    st.session_state.process_form['formalized_text'] = None
+                    st.rerun()
+            with col2:
+                if st.button("❌ Manter Original", use_container_width=True):
+                    st.session_state.process_form['show_formalization'] = False
+                    st.session_state.process_form['formalized_text'] = None
+                    st.rerun()
+    
+    # Lógica de submissão
+    if submit:
+        data = {
+            "process_name": process_name,
+            "process_owner": process_owner,
+            "process_description": description
+        }
+        required_fields = ["process_name", "process_owner", "process_description"]
+        if validate_and_submit(data, required_fields, on_submit):
+            st.success("Informações salvas com sucesso!")
 
 def render_process_details(on_submit: Optional[Callable] = None, initial_data: dict = None):
     """Renderiza o formulário de detalhes do processo."""
