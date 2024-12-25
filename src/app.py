@@ -21,6 +21,14 @@ def init_session_state():
         st.session_state.current_step = "identification"
     if 'form_data' not in st.session_state:
         st.session_state.form_data = {}
+    if 'process_details' not in st.session_state:
+        st.session_state.process_details = {
+            'custom_tools': [],
+            'custom_steps': [],
+            'selected_tab': 'steps',
+            'saved_steps': [],
+            'saved_tools': []
+        }
 
 def calculate_progress():
     """Calcula o progresso baseado na posição atual e dados preenchidos."""
