@@ -117,6 +117,11 @@ Este projeto está licenciado sob a licença MIT - veja o arquivo [LICENSE](LICE
 - [ ] Customização de templates
 - [ ] Exportação em múltiplos formatos
 - [ ] Interface de administração
+- [ ] Assistente de Formalização
+  - [ ] Botão "Formalizar" para descrições informais
+  - [ ] Preview da versão formalizada
+  - [ ] Sistema de aprovação/edição da formalização
+  - [ ] Histórico de versões da descrição
 - [ ] Auto-preenchimento Inteligente
   - [ ] Inferência de sistemas e ferramentas a partir da descrição
   - [ ] Sugestão de regras de negócio baseadas no contexto
@@ -151,6 +156,42 @@ automaticamente diversos campos dos formulários subsequentes:
   - Maior consistência nas informações
   - Captura de detalhes que poderiam ser esquecidos
   - Aprendizado contínuo com base no uso
+
+## 📝 Assistente de Formalização (Planejado)
+
+### Visão Geral
+O sistema oferecerá um assistente para transformar descrições informais em documentação 
+técnica profissional:
+
+1. **Processo de Formalização**
+  - Análise do texto informal
+  - Identificação de termos técnicos relevantes
+  - Estruturação em formato profissional
+  - Padronização da linguagem
+
+2. **Interface do Usuário**
+  - Campo de texto para descrição informal
+  - Botão "Formalizar" de fácil acesso
+  - Preview lado a lado (informal vs formal)
+  - Opções de personalização do nível de formalidade
+
+3. **Sistema de Aprovação**
+  - Visualização das alterações sugeridas
+  - Opção de aceitar/rejeitar mudanças específicas
+  - Editor para ajustes finos
+  - Confirmação final antes da atualização
+
+4. **Benefícios**
+  - Documentação mais profissional
+  - Consistência na linguagem técnica
+  - Economia de tempo na redação
+  - Melhoria na qualidade da documentação
+
+5. **Recursos Adicionais**
+  - Histórico de versões da descrição
+  - Sugestões de melhorias incrementais
+  - Integração com glossário técnico
+  - Adaptação ao estilo da organização
 
 ## 👥 Autores
 
