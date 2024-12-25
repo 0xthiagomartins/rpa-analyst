@@ -200,8 +200,11 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
             # Etapas comuns em formato de checkbox
             st.write("**Etapas Comuns**")
             selected_steps = []
+            saved_steps = initial_data.get('steps', [])
             for step in OPTIONS['common_steps']:
-                if st.checkbox(step, key=f"step_{step}"):
+                if st.checkbox(step, 
+                             key=f"step_{step}",
+                             value=step in saved_steps):  # Define o valor inicial do checkbox
                     selected_steps.append(step)
         
         with tab_tools:
@@ -209,8 +212,11 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
             # Sistemas comuns
             st.write("**Sistemas Comuns**")
             selected_systems = []
+            saved_tools = initial_data.get('tools', [])
             for system in OPTIONS['systems']['common_tools']:
-                if st.checkbox(system, key=f"system_{system}"):
+                if st.checkbox(system, 
+                             key=f"system_{system}",
+                             value=system in saved_tools):  # Define o valor inicial do checkbox
                     selected_systems.append(system)
         
         with tab_data:
@@ -228,7 +234,7 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
                 data_formats = st.multiselect(
                     "Formatos:",
                     ["Excel", "CSV", "PDF", "Texto", "Imagem", "Base de Dados"],
-                    default=[],
+                    default=initial_data.get('data_formats', []),
                     key="data_formats"
                 )
             
@@ -236,14 +242,14 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
                 data_sources = st.multiselect(
                     "Origens:",
                     ["Sistema Interno", "Planilha", "Email", "API", "Outro"],
-                    default=[],
+                    default=initial_data.get('data_sources', []),
                     key="data_sources"
                 )
                 
                 data_volume = st.select_slider(
                     "Volume:",
                     options=["Baixo", "Médio", "Alto", "Muito Alto"],
-                    value="Médio",
+                    value=initial_data.get('data_volume', "Médio"),
                     key="data_volume"
                 )
         
