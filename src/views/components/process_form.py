@@ -327,7 +327,7 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
                 ["Sistema", "Aplicativo", "Website", "API", "Outro"],
                 key="new_tool_type"
             )
-            if st.button("➕ Adicionar", key=f"btn_add_tool_{new_tool}"):
+            if st.button("�� Adicionar", key=f"btn_add_tool_{new_tool}"):
                 if new_tool and not any(t['name'] == new_tool for t in st.session_state.process_details['custom_tools']):
                     st.session_state.process_details['custom_tools'].append({
                         'name': new_tool,
@@ -442,20 +442,20 @@ def render_business_rules(on_submit: Optional[Callable] = None, initial_data: di
         standard_exceptions = [exc for exc in suggested_exceptions if exc in OPTIONS.get('common_exceptions', [])]
         custom_exceptions = [exc for exc in suggested_exceptions if exc not in OPTIONS.get('common_exceptions', [])]
         
-        # Atualiza o estado com as sugestões
+        # Atualiza o estado com as sugestões (mantendo como listas)
         if 'business_rules' not in st.session_state:
             st.session_state.business_rules = {
                 'selected_rules': standard_rules,
-                'custom_rules': '\n'.join(custom_rules),
+                'custom_rules': custom_rules,  # Mantém como lista
                 'selected_exceptions': standard_exceptions,
-                'custom_exceptions': '\n'.join(custom_exceptions)
+                'custom_exceptions': custom_exceptions  # Mantém como lista
             }
         else:
             st.session_state.business_rules.update({
                 'selected_rules': standard_rules,
-                'custom_rules': '\n'.join(custom_rules),
+                'custom_rules': custom_rules,  # Mantém como lista
                 'selected_exceptions': standard_exceptions,
-                'custom_exceptions': '\n'.join(custom_exceptions)
+                'custom_exceptions': custom_exceptions  # Mantém como lista
             })
     
     # Debug para verificar os dados processados
@@ -464,40 +464,74 @@ def render_business_rules(on_submit: Optional[Callable] = None, initial_data: di
         'business_rules_state': st.session_state.business_rules
     })
     
+    # Interface para adicionar/remover regras customizadas
+    st.write("### Regras de Negócio")
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.write("**Regras Customizadas Atuais:**")
+        custom_rules = st.session_state.business_rules.get('custom_rules', [])
+        for idx, rule in enumerate(custom_rules):
+            col_a, col_b = st.columns([4, 1])
+            with col_a:
+                st.info(f"• {rule}")
+            with col_b:
+                if st.button("🗑️", key=f"del_rule_{idx}"):
+                    custom_rules.remove(rule)
+                    st.rerun()
+    
+    with col2:
+        st.write("**Adicionar Nova Regra**")
+        new_rule = st.text_input("", 
+                                placeholder="Digite uma nova regra",
+                                key="new_rule_input")
+        if st.button("➕ Adicionar", key="add_rule_btn"):
+            if new_rule and new_rule not in custom_rules:
+                custom_rules.append(new_rule)
+                st.rerun()
+    
+    # Interface para adicionar/remover exceções customizadas
+    st.write("### Exceções e Tratamentos")
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.write("**Exceções Customizadas Atuais:**")
+        custom_exceptions = st.session_state.business_rules.get('custom_exceptions', [])
+        for idx, exception in enumerate(custom_exceptions):
+            col_a, col_b = st.columns([4, 1])
+            with col_a:
+                st.info(f"• {exception}")
+            with col_b:
+                if st.button("🗑️", key=f"del_exception_{idx}"):
+                    custom_exceptions.remove(exception)
+                    st.rerun()
+    
+    with col2:
+        st.write("**Adicionar Nova Exceção**")
+        new_exception = st.text_input("", 
+                                    placeholder="Digite uma nova exceção",
+                                    key="new_exception_input")
+        if st.button("➕ Adicionar", key="add_exception_btn"):
+            if new_exception and new_exception not in custom_exceptions:
+                custom_exceptions.append(new_exception)
+                st.rerun()
+    
+    # Formulário principal para seleção e salvamento
     with st.form("rules_form", clear_on_submit=False):
-        st.write("### Regras de Negócio")
-        
         # Templates de regras comuns
         selected_rules = st.multiselect(
-            "Selecione as regras aplicáveis:",
+            "Regras comuns:",
             OPTIONS.get('business_rules_templates', []),
-            default=st.session_state.business_rules.get('selected_rules', [])
+            default=st.session_state.business_rules.get('selected_rules', []),
+            help="Selecione as regras aplicáveis ao processo"
         )
-        
-        # Editor de regras customizadas
-        st.write("Adicione ou edite regras específicas:")
-        custom_rules = st.text_area(
-            "Regras customizadas",
-            value=st.session_state.business_rules.get('custom_rules', ''),
-            help="Digite uma regra por linha",
-            height=150
-        )
-        
-        st.write("### Exceções e Tratamentos")
         
         # Exceções comuns
         selected_exceptions = st.multiselect(
-            "Selecione as exceções possíveis:",
+            "Exceções comuns:",
             OPTIONS.get('common_exceptions', []),
-            default=st.session_state.business_rules.get('selected_exceptions', [])
-        )
-        
-        # Exceções customizadas
-        custom_exceptions = st.text_area(
-            "Adicione outras exceções específicas:",
-            value=st.session_state.business_rules.get('custom_exceptions', ''),
-            help="Digite uma exceção por linha",
-            height=150
+            default=st.session_state.business_rules.get('selected_exceptions', []),
+            help="Selecione as exceções aplicáveis ao processo"
         )
         
         # Botão de Salvar
@@ -511,12 +545,9 @@ def render_business_rules(on_submit: Optional[Callable] = None, initial_data: di
             })
             
             # Prepara dados para submissão
-            all_rules = selected_rules + [rule for rule in custom_rules.split('\n') if rule.strip()]
-            all_exceptions = selected_exceptions + [exc for exc in custom_exceptions.split('\n') if exc.strip()]
-            
             data = {
-                "business_rules": all_rules,
-                "exceptions": all_exceptions
+                "business_rules": selected_rules + custom_rules,
+                "exceptions": selected_exceptions + custom_exceptions
             }
             
             if validate_and_submit(data, ["business_rules", "exceptions"], on_submit):
@@ -544,20 +575,20 @@ def render_automation_goals(on_submit: Optional[Callable] = None, initial_data: 
         standard_kpis = [kpi for kpi in suggested_kpis if kpi in OPTIONS.get('kpi_templates', [])]
         custom_kpis = [kpi for kpi in suggested_kpis if kpi not in OPTIONS.get('kpi_templates', [])]
         
-        # Atualiza o estado com as sugestões
+        # Atualiza o estado com as sugestões (mantendo como listas)
         if 'automation_goals' not in st.session_state:
             st.session_state.automation_goals = {
                 'selected_goals': standard_goals,
-                'custom_goals': '\n'.join(custom_goals),
+                'custom_goals': custom_goals,  # Mantém como lista
                 'selected_kpis': standard_kpis,
-                'custom_kpis': '\n'.join(custom_kpis)
+                'custom_kpis': custom_kpis  # Mantém como lista
             }
         else:
             st.session_state.automation_goals.update({
                 'selected_goals': standard_goals,
-                'custom_goals': '\n'.join(custom_goals),
+                'custom_goals': custom_goals,  # Mantém como lista
                 'selected_kpis': standard_kpis,
-                'custom_kpis': '\n'.join(custom_kpis)
+                'custom_kpis': custom_kpis  # Mantém como lista
             })
     
     # Debug para verificar os dados processados
@@ -566,37 +597,74 @@ def render_automation_goals(on_submit: Optional[Callable] = None, initial_data: 
         'automation_goals_state': st.session_state.get('automation_goals', {})
     })
     
+    # Interface para adicionar/remover objetivos customizados
+    st.write("### Objetivos da Automação")
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.write("**Objetivos Customizados Atuais:**")
+        custom_goals = st.session_state.get('automation_goals', {}).get('custom_goals', [])
+        for idx, goal in enumerate(custom_goals):
+            col_a, col_b = st.columns([4, 1])
+            with col_a:
+                st.info(f"• {goal}")
+            with col_b:
+                if st.button("🗑️", key=f"del_goal_{idx}"):
+                    custom_goals.remove(goal)
+                    st.rerun()
+    
+    with col2:
+        st.write("**Adicionar Novo Objetivo**")
+        new_goal = st.text_input("", 
+                                placeholder="Digite um novo objetivo",
+                                key="new_goal_input")
+        if st.button("➕ Adicionar", key="add_goal_btn"):
+            if new_goal and new_goal not in custom_goals:
+                custom_goals.append(new_goal)
+                st.rerun()
+    
+    # Interface para adicionar/remover KPIs customizados
+    st.write("### KPIs e Métricas")
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.write("**KPIs Customizados Atuais:**")
+        custom_kpis = st.session_state.get('automation_goals', {}).get('custom_kpis', [])
+        for idx, kpi in enumerate(custom_kpis):
+            col_a, col_b = st.columns([4, 1])
+            with col_a:
+                st.info(f"• {kpi}")
+            with col_b:
+                if st.button("🗑️", key=f"del_kpi_{idx}"):
+                    custom_kpis.remove(kpi)
+                    st.rerun()
+    
+    with col2:
+        st.write("**Adicionar Novo KPI**")
+        new_kpi = st.text_input("", 
+                               placeholder="Digite um novo KPI",
+                               key="new_kpi_input")
+        if st.button("➕ Adicionar", key="add_kpi_btn"):
+            if new_kpi and new_kpi not in custom_kpis:
+                custom_kpis.append(new_kpi)
+                st.rerun()
+    
+    # Formulário principal para seleção e salvamento
     with st.form("goals_form", clear_on_submit=False):
-        st.write("### Objetivos da Automação")
-        
         # Seleção de objetivos comuns
         selected_goals = st.multiselect(
-            "Selecione os objetivos da automação:",
+            "Objetivos comuns:",
             OPTIONS['automation_goals'],
-            default=st.session_state.get('automation_goals', {}).get('selected_goals', [])
+            default=st.session_state.get('automation_goals', {}).get('selected_goals', []),
+            help="Selecione os objetivos aplicáveis ao processo"
         )
-        
-        # Objetivos customizados
-        custom_goals = st.text_area(
-            "Adicione outros objetivos específicos:",
-            value=st.session_state.get('automation_goals', {}).get('custom_goals', ''),
-            help="Digite um objetivo por linha"
-        )
-        
-        st.write("### KPIs e Métricas")
         
         # Seleção de KPIs comuns
         selected_kpis = st.multiselect(
-            "Selecione os KPIs aplicáveis:",
+            "KPIs comuns:",
             OPTIONS['kpi_templates'],
-            default=st.session_state.get('automation_goals', {}).get('selected_kpis', [])
-        )
-        
-        # KPIs customizados
-        custom_kpis = st.text_area(
-            "Adicione outros KPIs específicos:",
-            value=st.session_state.get('automation_goals', {}).get('custom_kpis', ''),
-            help="Digite um KPI por linha"
+            default=st.session_state.get('automation_goals', {}).get('selected_kpis', []),
+            help="Selecione os KPIs aplicáveis ao processo"
         )
         
         # Botão de Salvar
@@ -610,12 +678,9 @@ def render_automation_goals(on_submit: Optional[Callable] = None, initial_data: 
             }
             
             # Prepara dados para submissão
-            all_goals = selected_goals + [goal for goal in custom_goals.split('\n') if goal.strip()]
-            all_kpis = selected_kpis + [kpi for kpi in custom_kpis.split('\n') if kpi.strip()]
-            
             data = {
-                "automation_goals": all_goals,
-                "kpis": all_kpis
+                "automation_goals": selected_goals + custom_goals,
+                "kpis": selected_kpis + custom_kpis
             }
             
             if validate_and_submit(data, ["automation_goals", "kpis"], on_submit):

@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 import os
 from datetime import datetime
 from reportlab.lib import colors
@@ -93,6 +93,19 @@ class DocumentService:
                 ('BACKGROUND', (0, 0), (0, 0), colors.lightgrey),
                 ('PADDING', (0, 0), (-1, -1), 6),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),  # Alinha texto ao topo
+            ])
+        )
+    
+    def _create_list_field(self, items: List[str]) -> Table:
+        """Cria uma tabela com itens em formato de lista."""
+        formatted_items = "\n".join(f"• {item}" for item in items)
+        return Table(
+            [[Paragraph(formatted_items, self.styles['Normal'])]],
+            colWidths=[500],
+            style=TableStyle([
+                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                ('PADDING', (0, 0), (-1, -1), 6),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ])
         )
     
