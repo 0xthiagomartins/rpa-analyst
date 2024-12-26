@@ -1,10 +1,19 @@
 import streamlit as st
+
+# Configuração da página DEVE ser a primeira chamada Streamlit
+st.set_page_config(
+    page_title="Agente Analista de RPA",
+    page_icon="🤖",
+    layout="wide"
+)
+
 from src.views.components.process_form import (
     render_process_identification,
     render_process_details,
     render_business_rules,
     render_automation_goals
 )
+from src.views.components.process_diagram import render_process_diagram
 from src.services.document_service import DocumentService
 import os
 
@@ -173,6 +182,11 @@ def render_current_step():
     st.divider()
     render_step_navigation()
     
+    # Adiciona o diagrama após preencher todos os dados
+    if all(step in st.session_state.form_data for step in ["identification", "details", "business_rules", "automation_goals"]):
+        st.divider()
+        render_process_diagram(prepare_pdd_data())
+    
     # Botão de geração do PDD (apenas no último passo)
     if st.session_state.current_step == "automation_goals" and can_generate_pdd():
         st.divider()
@@ -206,12 +220,6 @@ def render_current_step():
 
 def main():
     """Função principal da aplicação."""
-    st.set_page_config(
-        page_title="Agente Analista de RPA",
-        page_icon="🤖",
-        layout="wide"
-    )
-    
     init_session_state()
     
     st.title("🤖 Agente Analista de RPA")

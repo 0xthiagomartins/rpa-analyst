@@ -6,6 +6,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from src.utils.logger import logger
+from src.services.ai_service import AIService
 
 class DocumentService:
     """Serviço para geração de documentos PDD."""
@@ -158,6 +159,18 @@ class DocumentService:
                     elements.append(self._create_field(label, value))
                     elements.append(Spacer(1, 10))
                 elements.append(Spacer(1, 20))
+            
+            # Gera o diagrama
+            ai_service = AIService()
+            mermaid_code = ai_service.generate_process_diagram(data)
+            
+            # Adiciona o diagrama ao documento
+            elements.append(Paragraph("2.1 Diagrama do Processo", self.styles['SectionTitle']))
+            elements.append(Paragraph("O diagrama abaixo representa o fluxo do processo:", self.styles['Normal']))
+            
+            # TODO: Converter diagrama Mermaid para imagem e adicionar ao PDF
+            # Por enquanto, adiciona como texto
+            elements.append(Paragraph(mermaid_code, self.styles['Code']))
             
             # Rodapé
             elements.append(Spacer(1, 30))

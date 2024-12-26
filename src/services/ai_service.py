@@ -289,3 +289,116 @@ class AIService:
         except Exception as e:
             logger.error(f"Erro ao analisar descrição: {str(e)}")
             raise ValueError(f"Erro ao analisar descrição: {str(e)}")
+
+    def validate_and_fix_mermaid(self, mermaid_code: str) -> str:
+        """Valida e corrige o código Mermaid usando IA."""
+        template = """
+        Você é um especialista em sintaxe Mermaid.
+        Analise e corrija o código Mermaid abaixo, garantindo que siga as melhores práticas.
+        
+        Código Original:
+        {code}
+        
+        Regras de Correção:
+        1. Mantenha apenas uma declaração flowchart TD
+        2. IDs dos nós devem ser únicos e sem caracteres especiais
+        3. Conexões devem usar sintaxe correta: A --> B ou A -->|texto| B
+        4. Nós de decisão devem usar {{texto}} ao invés de >texto]
+        5. Estilos devem estar no formato correto: style id fill:#cor,stroke:#333
+        6. Subgraphs devem estar corretamente formatados
+        7. Mantenha a identação consistente (4 espaços)
+        8. Agrupe os elementos de forma lógica:
+           - Primeiro os nós
+           - Depois as conexões
+           - Por último os estilos
+        
+        Retorne apenas o código Mermaid corrigido, sem explicações.
+        """
+        
+        try:
+            chain = LLMChain(llm=self.llm, prompt=ChatPromptTemplate.from_template(template))
+            result = chain.invoke({"code": mermaid_code})
+            return result['text'].strip()
+        except Exception as e:
+            logger.error(f"Erro ao corrigir diagrama: {str(e)}")
+            return mermaid_code
+
+    def generate_process_diagram(self, process_data: dict) -> str:
+        """Gera um diagrama Mermaid baseado nos dados do processo."""
+        template = """
+        Você é um especialista em diagramas UML e Mermaid.
+        Crie um diagrama de fluxo que represente o processo RPA descrito abaixo.
+        
+        Processo: {process_name}
+        Descrição: {description}
+        
+        Etapas do Processo:
+        {steps}
+        
+        Sistemas Utilizados:
+        {systems}
+        
+        Regras de Negócio:
+        {rules}
+        
+        Instruções para o Diagrama:
+        1. Use flowchart TD
+        2. IDs dos nós devem ser únicos e usar snake_case (ex: validar_dados)
+        3. Tipos de nós:
+           - Início/Fim: ((texto))
+           - Ações: [texto]
+           - Decisões: {{texto}}
+           - Sistemas: [(texto)]
+        4. Conexões:
+           - Fluxo simples: A --> B
+           - Fluxo com label: A -->|texto| B
+        5. Estrutura do código:
+           - Primeiro declare todos os nós
+           - Depois todas as conexões
+           - Por último todos os estilos
+        6. Cores e estilos:
+           style inicio fill:#f9f9f9,stroke:#333
+           style acao fill:#bbdefb,stroke:#333
+           style decisao fill:#fff59d,stroke:#333
+           style sistema fill:#c8e6c9,stroke:#333
+        
+        Exemplo de código correto:
+        flowchart TD
+            inicio((Início))
+            validar{{Validar Dados}}
+            processar[Processar]
+            sistema[(CRM)]
+            fim((Fim))
+
+            inicio --> validar
+            validar -->|Válido| processar
+            validar -->|Inválido| fim
+            processar --> sistema
+            sistema --> fim
+
+            style inicio fill:#f9f9f9,stroke:#333
+            style validar fill:#fff59d,stroke:#333
+            style processar fill:#bbdefb,stroke:#333
+            style sistema fill:#c8e6c9,stroke:#333
+            style fim fill:#f9f9f9,stroke:#333
+        
+        Retorne apenas o código Mermaid, sem explicações.
+        """
+        
+        try:
+            chain = LLMChain(llm=self.llm, prompt=ChatPromptTemplate.from_template(template))
+            result = chain.invoke({
+                "process_name": process_data.get('process_name', ''),
+                "description": process_data.get('process_description', ''),
+                "steps": "\n".join(f"- {step}" for step in process_data.get('steps_as_is', [])),
+                "systems": "\n".join(f"- {system}" for system in process_data.get('systems', [])),
+                "rules": "\n".join(f"- {rule}" for rule in process_data.get('business_rules', []))
+            })
+            
+            # Limpa e valida o código gerado
+            mermaid_code = result['text'].strip()
+            return self.validate_and_fix_mermaid(mermaid_code)
+            
+        except Exception as e:
+            logger.error(f"Erro ao gerar diagrama: {str(e)}")
+            raise ValueError(f"Erro ao gerar diagrama: {str(e)}")
