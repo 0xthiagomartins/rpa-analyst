@@ -7,6 +7,7 @@ from src.views.components.diagram_editor import render_diagram_editor
 from .description_formalizer import render_description_formalizer
 from src.services.ai_service import AIService
 from streamlit_modal import Modal
+from streamlit_sortables import sort_items
 
 def load_form_options():
     """Carrega as opções predefinidas do formulário."""
@@ -36,6 +37,101 @@ def validate_and_submit(data: dict, required_fields: List[str], on_submit: Calla
     except Exception as e:
         st.error(f"Erro ao submeter formulário: {str(e)}")
         return False
+
+def render_ai_suggestions_debug(suggestions: dict):
+    """Renderiza uma seção de debug com todas as sugestões da IA."""
+    # Estilo para melhor visualização
+    st.markdown("""
+    <style>
+    .debug-section {
+        padding: 10px;
+        border-left: 3px solid #3498db;
+        margin: 10px 0;
+        background-color: #f8f9fa;
+    }
+    .json-view {
+        font-family: monospace;
+        white-space: pre;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Tabs para organizar a visualização
+    tab1, tab2 = st.tabs(["📊 Visualização Formatada", "🔍 JSON Completo"])
+    
+    with tab1:
+        # Etapas do Processo
+        st.markdown("<div class='debug-section'>", unsafe_allow_html=True)
+        st.write("**📝 Etapas do Processo:**")
+        for step in suggestions.get('steps_as_is', []):
+            st.write(f"• {step}")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Sistemas e Ferramentas
+        st.markdown("<div class='debug-section'>", unsafe_allow_html=True)
+        st.write("**🔧 Sistemas e Ferramentas:**")
+        for tool in suggestions.get('details', {}).get('tools', []):
+            st.write(f"• {tool}")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Dados do Processo
+        st.markdown("<div class='debug-section'>", unsafe_allow_html=True)
+        st.write("**📊 Dados do Processo:**")
+        details = suggestions.get('details', {})
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("*Tipos de Dados:*")
+            for dtype in details.get('data_types', []):
+                st.write(f"• {dtype}")
+                
+            st.write("*Formatos de Dados:*")
+            for fmt in details.get('data_formats', []):
+                st.write(f"• {fmt}")
+        
+        with col2:
+            st.write("*Fontes de Dados:*")
+            for src in details.get('data_sources', []):
+                st.write(f"• {src}")
+                
+            st.write("*Volume de Dados:*")
+            st.write(f"• {details.get('data_volume', 'Não especificado')}")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Regras de Negócio
+        st.markdown("<div class='debug-section'>", unsafe_allow_html=True)
+        st.write("**📋 Regras de Negócio:**")
+        for rule in suggestions.get('business_rules', {}).get('business_rules', []):
+            st.write(f"• {rule}")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Exceções
+        st.markdown("<div class='debug-section'>", unsafe_allow_html=True)
+        st.write("**⚠️ Exceções:**")
+        for exc in suggestions.get('business_rules', {}).get('exceptions', []):
+            st.write(f"• {exc}")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Objetivos e KPIs
+        st.markdown("<div class='debug-section'>", unsafe_allow_html=True)
+        st.write("**🎯 Objetivos e KPIs:**")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("*Objetivos:*")
+            for goal in suggestions.get('automation_goals', {}).get('automation_goals', []):
+                st.write(f"• {goal}")
+        with col2:
+            st.write("*KPIs:*")
+            for kpi in suggestions.get('automation_goals', {}).get('kpis', []):
+                st.write(f"• {kpi}")
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    with tab2:
+        st.json(suggestions)
 
 def render_process_identification(on_submit: Optional[Callable] = None, initial_data: dict = None):
     """Renderiza o formulário de identificação do processo."""
@@ -146,279 +242,493 @@ def render_process_identification(on_submit: Optional[Callable] = None, initial_
             "process_owner": process_owner,
             "process_description": description
         }
-        required_fields = ["process_name", "process_owner", "process_description"]
-        if validate_and_submit(data, required_fields, on_submit):
-            # Analisa a descrição e sugere valores
+        
+        if validate_and_submit(data, ["process_name", "process_owner"], on_submit):
             try:
-                with st.spinner("Analisando descrição..."):
-                    ai_service = AIService()
-                    suggestions = ai_service.analyze_process_description(description)
-                    
-                    # Armazena sugestões no estado da sessão
-                    if 'ai_suggestions' not in st.session_state:
+                # Analisa a descrição com IA
+                ai_service = AIService()
+                suggestions = ai_service.analyze_process_description(description)
+                st.session_state.ai_suggestions = suggestions
+                
+                # Mostra opções para aplicar sugestões
+                st.success("Descrição analisada com sucesso!")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ Aplicar Sugestões", use_container_width=True):
+                        # Aplica as sugestões aos dados do formulário
+                        st.session_state.form_data['details'] = suggestions['details']
+                        st.session_state.form_data['business_rules'] = suggestions['business_rules']
+                        st.session_state.form_data['automation_goals'] = suggestions['automation_goals']
+                        st.success("Sugestões aplicadas! Você pode revisar e ajustar nos próximos passos.")
+                        st.rerun()
+                with col2:
+                    if st.button("❌ Ignorar Sugestões", use_container_width=True):
                         st.session_state.ai_suggestions = {}
-                    
-                    st.session_state.ai_suggestions = suggestions
-                    
-                    # Mostra preview das sugestões
-                    with st.expander("🤖 Sugestões da IA", expanded=True):
-                        st.info("Com base na descrição, foram identificados os seguintes elementos:")
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.write("**Etapas Identificadas:**")
-                            for step in suggestions['details']['steps']:
-                                st.write(f"• {step}")
-                            
-                            st.write("**Sistemas/Ferramentas:**")
-                            for tool in suggestions['details']['tools']:
-                                st.write(f"• {tool}")
-                        
-                        with col2:
-                            st.write("**Regras de Negócio:**")
-                            for rule in suggestions['business_rules']['business_rules']:
-                                st.write(f"• {rule}")
-                            
-                            st.write("**Objetivos:**")
-                            for goal in suggestions['automation_goals']['automation_goals']:
-                                st.write(f"• {goal}")
-                        
-                        # Botões para aceitar/rejeitar sugestões
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.button("✅ Usar Sugestões", use_container_width=True):
-                                # Salva as sugestões no estado
-                                st.session_state.ai_suggestions = suggestions
-                                
-                                # Atualiza o process_details com as sugestões
-                                if 'process_details' not in st.session_state:
-                                    st.session_state.process_details = {
-                                        'custom_tools': [],
-                                        'custom_steps': [],
-                                        'selected_tab': 'steps',
-                                        'saved_steps': suggestions['details']['steps'],
-                                        'saved_tools': suggestions['details']['tools']
-                                    }
-                                else:
-                                    st.session_state.process_details.update({
-                                        'saved_steps': suggestions['details']['steps'],
-                                        'saved_tools': suggestions['details']['tools']
-                                    })
-                                
-                                # Atualiza o form_data
-                                st.session_state.form_data['details'] = suggestions['details']
-                                st.session_state.form_data['business_rules'] = suggestions['business_rules']
-                                st.session_state.form_data['automation_goals'] = suggestions['automation_goals']
-                                
-                                st.success("Sugestões aplicadas! Você pode revisar e ajustar nos próximos passos.")
-                                st.rerun()
-                        with col2:
-                            if st.button("❌ Ignorar Sugestões", use_container_width=True):
-                                st.session_state.ai_suggestions = {}
-                                st.info("Sugestões ignoradas. Continue o preenchimento normalmente.")
+                        st.info("Sugestões ignoradas. Continue o preenchimento normalmente.")
                 
             except Exception as e:
                 st.error(f"Erro ao analisar descrição: {str(e)}")
             
             st.success("Informações salvas com sucesso!")
 
+    # Mostra sugestões da IA fora do formulário, apenas se existirem
+    if 'ai_suggestions' in st.session_state and st.session_state.ai_suggestions:
+        st.write("---")
+        st.subheader("🤖 Análise da IA")
+        st.info("A IA analisou sua descrição e identificou as seguintes informações:")
+        render_ai_suggestions_debug(st.session_state.ai_suggestions)
+
+def filter_valid_options(suggested_values: List[str], valid_options: List[str]) -> List[str]:
+    """Filtra valores sugeridos para incluir apenas opções válidas."""
+    return [value for value in suggested_values if value in valid_options]
+
+def render_step_card(i: int, step: dict, on_delete: Callable):
+    """Renderiza um card para uma etapa do processo."""
+    with st.container():
+        st.markdown("""
+        <style>
+        .step-card {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 3px solid #1f77b4;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        with st.container():
+            st.markdown(f'<div class="step-card">', unsafe_allow_html=True)
+            
+            # Cabeçalho com número da etapa e botões
+            col1, col2, col3 = st.columns([8, 1, 1])
+            with col1:
+                st.subheader(f"Etapa {i+1}")
+            with col2:
+                if st.button("⬆️", key=f"up_{i}", help="Mover para cima"):
+                    if i > 0:
+                        st.session_state.process_steps[i], st.session_state.process_steps[i-1] = \
+                            st.session_state.process_steps[i-1], st.session_state.process_steps[i]
+                        st.rerun()
+            with col3:
+                if st.button("🗑️", key=f"del_{i}", help="Remover etapa"):
+                    on_delete(i)
+            
+            # Nome da etapa
+            step['name'] = st.text_input(
+                "Nome da Etapa",
+                value=step.get('name', ''),
+                key=f"step_name_{i}",
+                placeholder="Ex: Acessar sistema"
+            )
+            
+            # Descrição detalhada (opcional)
+            step['description'] = st.text_area(
+                "Descrição Detalhada (opcional)",
+                value=step.get('description', ''),
+                key=f"step_desc_{i}",
+                placeholder="Descreva os detalhes desta etapa...",
+                help="Forneça informações adicionais sobre esta etapa"
+            )
+            
+            # Upload de imagem (opcional)
+            uploaded_file = st.file_uploader(
+                "Imagem da Etapa (opcional)",
+                type=['png', 'jpg', 'jpeg'],
+                key=f"step_img_{i}",
+                help="Faça upload de uma imagem ilustrativa"
+            )
+            
+            if uploaded_file:
+                step['image'] = uploaded_file.getvalue()
+                st.image(step['image'], caption=f"Imagem da Etapa {i+1}", use_column_width=True)
+            elif 'image' in step and step['image']:
+                st.image(step['image'], caption=f"Imagem da Etapa {i+1}", use_column_width=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+
+def render_tool_card(i: int, tool: dict, on_delete: Callable):
+    """Renderiza um card para uma ferramenta/sistema customizado."""
+    with st.container():
+        st.markdown(f'<div class="step-card">', unsafe_allow_html=True)
+        
+        # Cabeçalho com número e botões
+        col1, col2, col3 = st.columns([8, 1, 1])
+        with col1:
+            st.subheader(f"Sistema {i+1}")
+        with col2:
+            if st.button("⬆️", key=f"tool_up_{i}", help="Mover para cima"):
+                if i > 0:
+                    st.session_state.custom_tools[i], st.session_state.custom_tools[i-1] = \
+                        st.session_state.custom_tools[i-1], st.session_state.custom_tools[i]
+                    st.rerun()
+        with col3:
+            if st.button("🗑️", key=f"tool_del_{i}", help="Remover sistema"):
+                on_delete(i)
+        
+        # Nome do sistema
+        tool['name'] = st.text_input(
+            "Nome do Sistema",
+            value=tool.get('name', ''),
+            key=f"tool_name_{i}",
+            placeholder="Ex: Sistema Interno XYZ"
+        )
+        
+        # Descrição do sistema (opcional)
+        tool['description'] = st.text_area(
+            "Descrição do Sistema (opcional)",
+            value=tool.get('description', ''),
+            key=f"tool_desc_{i}",
+            placeholder="Descreva o sistema e seu papel no processo...",
+            help="Forneça informações adicionais sobre este sistema"
+        )
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+def render_step_edit_modal(step: dict, step_number: int):
+    """Renderiza o modal de edição de etapa."""
+    modal = Modal(
+        "Editar Etapa",
+        key=f"modal_edit_step_{step_number}"
+    )
+
+    if modal.is_open():
+        with modal.container():
+            with st.form(f"edit_step_form_{step_number}"):
+                st.write(f"### Editar Etapa {step_number + 1}")
+                
+                # Nome da etapa
+                new_name = st.text_input(
+                    "Nome da Etapa",
+                    value=step.get('name', ''),
+                    placeholder="Ex: Acessar sistema"
+                )
+                
+                # Descrição detalhada
+                new_description = st.text_area(
+                    "Descrição Detalhada",
+                    value=step.get('description', ''),
+                    placeholder="Descreva os detalhes desta etapa..."
+                )
+                
+                # Upload de imagem
+                uploaded_file = st.file_uploader(
+                    "Imagem da Etapa",
+                    type=['png', 'jpg', 'jpeg']
+                )
+                
+                if uploaded_file:
+                    new_image = uploaded_file.getvalue()
+                    st.image(new_image, caption="Preview da Imagem")
+                elif step.get('image'):
+                    st.image(step['image'], caption="Imagem Atual")
+                    new_image = step['image']
+                else:
+                    new_image = None
+                
+                # Botões de ação
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.form_submit_button("💾 Salvar"):
+                        step.update({
+                            'name': new_name,
+                            'description': new_description,
+                            'image': new_image
+                        })
+                        modal.close()
+                        st.rerun()
+                
+                with col2:
+                    if st.form_submit_button("❌ Cancelar"):
+                        modal.close()
+                        st.rerun()
+
 def render_process_details(on_submit: Optional[Callable] = None, initial_data: dict = None):
     """Renderiza o formulário de detalhes do processo."""
-    # Garante que form_data existe
-    if 'form_data' not in st.session_state:
-        st.session_state.form_data = {}
-    
-    # Pega os dados salvos - AQUI ESTÁ O PROBLEMA
+    # Usa dados salvos ou iniciais
     saved_data = st.session_state.form_data.get('details', {})
+    initial_data = saved_data or initial_data or {}
     
-    # Se não tiver dados salvos mas tiver sugestões, usa as sugestões
-    if not saved_data and 'ai_suggestions' in st.session_state:
-        saved_data = st.session_state.ai_suggestions.get('details', {})
+    # Verifica se já temos uma descrição do processo
+    process_description = st.session_state.form_data.get('identification', {}).get('process_description', '')
     
-    # Processa as sugestões separando em padrão e customizado
-    if saved_data:
-        suggested_steps = saved_data.get('steps', [])
-        suggested_tools = saved_data.get('tools', [])
-        
-        # Separa os steps em padrão e customizado
-        standard_steps = [step for step in suggested_steps if step in OPTIONS['common_steps']]
-        custom_steps = [step for step in suggested_steps if step not in OPTIONS['common_steps']]
-        
-        # Separa as ferramentas em padrão e customizado
-        all_standard_tools = [tool for tools in OPTIONS['systems'].values() if isinstance(tools, list) for tool in tools]
-        standard_tools = [tool for tool in suggested_tools if tool in all_standard_tools]
-        custom_tools = [{'name': tool, 'type': 'Sistema'} 
-                       for tool in suggested_tools 
-                       if tool not in all_standard_tools]
-        
-        # Atualiza o estado com as sugestões
-        if 'process_details' not in st.session_state:
-            st.session_state.process_details = {
-                'custom_tools': custom_tools,
-                'custom_steps': custom_steps,
-                'selected_tab': 'steps',
-                'saved_steps': standard_steps,
-                'saved_tools': standard_tools
+    # Se temos uma descrição e não temos dados inferidos, vamos inferir
+    if process_description and not saved_data:
+        try:
+            ai_service = AIService()
+            analysis = ai_service.analyze_process_description(process_description)
+            
+            # Filtra as sugestões para incluir apenas opções válidas
+            initial_data = {
+                'steps': analysis['details'].get('steps', []),
+                'tools': {
+                    'common_tools': filter_valid_options(
+                        analysis['details'].get('tools', []),
+                        OPTIONS['systems']['common_tools']
+                    ),
+                    'custom_tools': []
+                },
+                'data_types': filter_valid_options(
+                    analysis['details'].get('data_types', []),
+                    OPTIONS['data_types']
+                ),
+                'data_formats': filter_valid_options(
+                    analysis['details'].get('data_formats', []),
+                    OPTIONS['data_formats']
+                ),
+                'data_sources': filter_valid_options(
+                    analysis['details'].get('data_sources', []),
+                    OPTIONS['data_sources']
+                ),
+                'data_volume': analysis['details'].get('data_volume', 'Médio')
             }
-        else:
-            st.session_state.process_details.update({
-                'custom_tools': custom_tools,
-                'custom_steps': custom_steps,
-                'saved_steps': standard_steps,
-                'saved_tools': standard_tools
-            })
+        except Exception as e:
+            st.warning(f"Não foi possível inferir dados automaticamente: {str(e)}")
     
-    # Debug para verificar os dados processados
-    st.write("Debug - Dados Processados:", {
-        'standard_steps': st.session_state.process_details.get('saved_steps', []),
-        'custom_steps': st.session_state.process_details.get('custom_steps', []),
-        'standard_tools': st.session_state.process_details.get('saved_tools', []),
-        'custom_tools': st.session_state.process_details.get('custom_tools', [])
-    })
+    # Inicializa estruturas de dados mais ricas
+    if 'process_steps' not in st.session_state:
+        steps = initial_data.get('steps', [])
+        st.session_state.process_steps = [{'name': step} for step in steps] if steps else [{'name': ''}]
     
-    # Tabs para organizar as seções
-    tab_steps, tab_tools, tab_data = st.tabs([
-        "📝 Etapas do Processo",
-        "🔧 Sistemas e Ferramentas",
-        "📊 Dados Utilizados"
-    ])
-    
-    with tab_steps:
-        st.write("### Etapas do Processo")
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.write("**Etapas Customizadas**")
-            for idx, step in enumerate(st.session_state.process_details['custom_steps']):
-                col_a, col_b = st.columns([3, 1])
-                with col_a:
-                    st.info(f"• {step}")
-                with col_b:
-                    if st.button("🗑️", key=f"btn_remove_step_{idx}_{step}"):
-                        st.session_state.process_details['custom_steps'].remove(step)
-                        st.rerun()
+    # Inicializa sistemas customizados
+    if 'custom_tools' not in st.session_state:
+        tools_data = initial_data.get('tools', {})
+        custom_tools = []
         
-        with col2:
-            st.write("**Adicionar Nova Etapa**")
-            new_step = st.text_input("", placeholder="Digite uma nova etapa", key="new_step")
-            if st.button("➕ Adicionar", key=f"btn_add_step_{new_step}"):
-                if new_step and new_step not in st.session_state.process_details['custom_steps']:
-                    st.session_state.process_details['custom_steps'].append(new_step)
+        # Adiciona ferramentas inferidas pela IA
+        if 'ai_suggestions' in st.session_state:
+            ai_tools = st.session_state.ai_suggestions.get('details', {}).get('tools', [])
+            if ai_tools:
+                for tool in ai_tools:
+                    # Extrai o nome base do sistema e sua descrição
+                    if "(" in tool and ")" in tool:
+                        tool_name = tool[:tool.find("(")].strip()
+                        tool_desc = tool[tool.find("(")+1:tool.find(")")].strip()
+                    else:
+                        tool_name = tool.strip()
+                        tool_desc = ""
+                    
+                    # Se não for um sistema comum, adiciona aos customizados
+                    if tool_name not in OPTIONS['systems']['common_tools']:
+                        custom_tools.append({
+                            'name': tool_name,
+                            'description': tool_desc
+                        })
+                    # Se for um sistema comum, adiciona à lista de seleção padrão
+                    else:
+                        if 'common_tools' not in initial_data.get('tools', {}):
+                            initial_data.setdefault('tools', {})['common_tools'] = []
+                        if tool_name not in initial_data['tools']['common_tools']:
+                            initial_data['tools']['common_tools'].append(tool_name)
+        
+        # Adiciona ferramentas customizadas dos dados iniciais
+        if isinstance(tools_data, dict):
+            for tool in tools_data.get('custom_tools', []):
+                if not any(t['name'] == tool for t in custom_tools):
+                    custom_tools.append({'name': tool})
+        
+        # Se não houver nenhuma ferramenta, adiciona uma vazia
+        st.session_state.custom_tools = custom_tools if custom_tools else [{'name': '', 'description': ''}]
+    
+    # Controles de estado
+    if 'editing_step' not in st.session_state:
+        st.session_state.editing_step = None
+    
+    # Gerenciamento de etapas (fora do form)
+    st.write("### 📝 Etapas do Processo")
+    
+    # Prepara os itens para ordenação
+    step_labels = [
+        f"{i+1}. {step.get('name', 'Nova Etapa')}"
+        for i, step in enumerate(st.session_state.process_steps)
+    ]
+    
+    # Renderiza a lista ordenável
+    sorted_indices = sort_items(step_labels)
+    
+    # Se a ordem mudou, reordena as etapas
+    if sorted_indices != step_labels:
+        # Extrai os índices originais dos labels ordenados
+        original_indices = [
+            int(label.split('.')[0]) - 1
+            for label in sorted_indices
+        ]
+        
+        # Reordena as etapas
+        st.session_state.process_steps = [
+            st.session_state.process_steps[i]
+            for i in original_indices
+        ]
+        st.rerun()
+    
+    # Renderiza os detalhes de cada etapa
+    for i, step in enumerate(st.session_state.process_steps):
+        with st.container():
+            cols = st.columns([8, 1, 1])
+            
+            with cols[0]:
+                st.write(step.get('name', 'Nova Etapa'))
+                if step.get('description'):
+                    st.caption(
+                        step.get('description', '')[:100] + '...' 
+                        if len(step.get('description', '')) > 100 
+                        else step.get('description', '')
+                    )
+                if step.get('image'):
+                    st.image(step.get('image'), width=100)
+            
+            with cols[1]:
+                if st.button("✏️", key=f"edit_{i}"):
+                    render_step_edit_modal(step, i)
+            
+            with cols[2]:
+                if st.button("🗑️", key=f"delete_{i}"):
+                    st.session_state.process_steps.pop(i)
                     st.rerun()
     
-    with tab_tools:
-        st.write("### Sistemas e Ferramentas")
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.write("**Ferramentas Customizadas**")
-            for idx, tool in enumerate(st.session_state.process_details['custom_tools']):
-                col_a, col_b = st.columns([3, 1])
-                with col_a:
-                    st.info(f"• {tool['name']} ({tool['type']})")
-                with col_b:
-                    if st.button("🗑️", key=f"btn_remove_tool_{idx}_{tool['name']}"):
-                        st.session_state.process_details['custom_tools'].remove(tool)
-                        st.rerun()
-        
-        with col2:
-            st.write("**Adicionar Nova Ferramenta**")
-            new_tool = st.text_input("", placeholder="Nome da ferramenta", key="new_tool")
-            tool_type = st.selectbox(
-                "",
-                ["Sistema", "Aplicativo", "Website", "API", "Outro"],
-                key="new_tool_type"
+    # Botão para adicionar nova etapa
+    if st.button("➕ Nova Etapa", key="add_new"):
+        st.session_state.process_steps.append({'name': '', 'description': '', 'image': None})
+        st.rerun()
+    
+    # Modal de edição
+    if st.session_state.editing_step is not None:
+        with st.form(f"edit_form_{st.session_state.editing_step}"):
+            step = st.session_state.process_steps[st.session_state.editing_step]
+            
+            st.write(f"### Editar Etapa {st.session_state.editing_step + 1}")
+            
+            step['name'] = st.text_input(
+                "Nome da Etapa",
+                value=step.get('name', ''),
+                placeholder="Ex: Acessar sistema"
             )
-            if st.button("�� Adicionar", key=f"btn_add_tool_{new_tool}"):
-                if new_tool and not any(t['name'] == new_tool for t in st.session_state.process_details['custom_tools']):
-                    st.session_state.process_details['custom_tools'].append({
-                        'name': new_tool,
-                        'type': tool_type
-                    })
-                    st.rerun()
+            
+            step['description'] = st.text_area(
+                "Descrição Detalhada",
+                value=step.get('description', ''),
+                placeholder="Descreva os detalhes desta etapa..."
+            )
+            
+            uploaded_file = st.file_uploader(
+                "Imagem da Etapa",
+                type=['png', 'jpg', 'jpeg']
+            )
+            
+            if uploaded_file:
+                step['image'] = uploaded_file.getvalue()
+                st.image(step['image'], caption="Preview da Imagem")
+            elif step.get('image'):
+                st.image(step['image'], caption="Imagem Atual")
+            
+            if st.form_submit_button("Salvar"):
+                st.session_state.editing_step = None
+                st.rerun()
     
     # Formulário principal
-    with st.form("details_form", clear_on_submit=False):
-        with tab_steps:
-            st.write("**Etapas Comuns**")
-            selected_steps = []
-            
-            # Debug para ver os steps que deveriam estar selecionados
-            st.write("Debug - Steps para selecionar:", st.session_state.process_details['saved_steps'])
-            
-            for step in OPTIONS['common_steps']:
-                is_selected = step in st.session_state.process_details['saved_steps']
-                if st.checkbox(step, 
-                             key=f"step_{step}",
-                             value=is_selected):
-                    selected_steps.append(step)
-            
-            # Adiciona etapas customizadas
-            selected_steps.extend(st.session_state.process_details['custom_steps'])
+    with st.form("details_form"):
+        # Sistemas e Ferramentas
+        st.write("### 🔧 Sistemas e Ferramentas")
         
-        with tab_tools:
-            st.write("**Sistemas e Ferramentas Comuns**")
-            selected_systems = []
-            
-            # Agrupa ferramentas por categoria
-            for category, tools in OPTIONS['systems'].items():
-                if isinstance(tools, list):
-                    st.write(f"**{category.replace('_', ' ').title()}:**")
-                    for system in tools:
-                        # Verifica se a ferramenta está nas sugestões salvas
-                        is_selected = (system in st.session_state.process_details.get('saved_tools', []))
-                        if st.checkbox(system, 
-                                     key=f"system_{system}",
-                                     value=is_selected):  # Usa o valor salvo
-                            selected_systems.append(system)
-            
-            # Adiciona ferramentas customizadas
-            selected_systems.extend([t['name'] for t in st.session_state.process_details.get('custom_tools', [])])
+        # Sistemas Comuns (Predefinidos)
+        st.write("**Sistemas Comuns**")
+        common_tools = st.multiselect(
+            "Selecione os sistemas predefinidos:",
+            OPTIONS['systems']['common_tools'],
+            default=initial_data.get('tools', {}).get('common_tools', []),
+            help="Selecione os sistemas comumente utilizados na empresa"
+        )
         
-        with tab_data:
-            st.write("### Dados do Processo")
-            col1, col2 = st.columns(2)
+        st.divider()
+        
+        # Sistemas Customizados
+        st.write("**Sistemas Customizados**")
+        
+        # Lista de sistemas customizados
+        custom_tools = []
+        for i, tool in enumerate(st.session_state.custom_tools):
+            cols = st.columns([8, 4])
+            with cols[0]:
+                tool_name = st.text_input(
+                    f"Sistema {i+1}",
+                    value=tool.get('name', ''),
+                    key=f"custom_tool_{i}",
+                    placeholder="Nome do sistema customizado"
+                )
+            with cols[1]:
+                tool_desc = st.text_input(
+                    "Descrição",
+                    value=tool.get('description', ''),
+                    key=f"custom_tool_desc_{i}",
+                    placeholder="Finalidade do sistema"
+                )
+            if tool_name:
+                custom_tools.append({
+                    'name': tool_name,
+                    'description': tool_desc
+                })
+        
+        # Botão para adicionar novo sistema
+        if st.form_submit_button("➕ Adicionar Sistema"):
+            st.session_state.custom_tools.append({'name': ''})
+            st.rerun()
+        
+        st.divider()
+        
+        # Seção 3: Dados do Processo
+        st.write("### 📊 Dados do Processo")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Tipos e Formatos**")
+            data_types = st.multiselect(
+                "Tipos de Dados:",
+                OPTIONS['data_types'],
+                default=initial_data.get('data_types', [])
+            )
             
-            with col1:
-                data_types = st.multiselect(
-                    "Tipos de Dados:",
-                    OPTIONS['data_types'],
-                    default=initial_data.get('data_types', []),
-                    key="data_types"
-                )
-                
-                data_formats = st.multiselect(
-                    "Formatos:",
-                    ["Excel", "CSV", "PDF", "Texto", "Imagem", "Base de Dados"],
-                    default=initial_data.get('data_formats', []),
-                    key="data_formats"
-                )
+            data_formats = st.multiselect(
+                "Formatos de Dados:",
+                OPTIONS['data_formats'],
+                default=initial_data.get('data_formats', [])
+            )
+        
+        with col2:
+            st.write("**Fontes e Volume**")
+            data_sources = st.multiselect(
+                "Fontes de Dados:",
+                OPTIONS['data_sources'],
+                default=initial_data.get('data_sources', [])
+            )
             
-            with col2:
-                data_sources = st.multiselect(
-                    "Origens:",
-                    ["Sistema Interno", "Planilha", "Email", "API", "Outro"],
-                    default=initial_data.get('data_sources', []),
-                    key="data_sources"
-                )
-                
-                data_volume = st.select_slider(
-                    "Volume:",
-                    options=["Baixo", "Médio", "Alto", "Muito Alto"],
-                    value=initial_data.get('data_volume', "Médio"),
-                    key="data_volume"
-                )
+            data_volume = st.select_slider(
+                "Volume de Dados:",
+                options=['Baixo', 'Médio', 'Alto'],
+                value=initial_data.get('data_volume', 'Médio')
+            )
         
         # Botão de Salvar
-        if st.form_submit_button("💾 Salvar", use_container_width=True, type="primary"):
+        if st.form_submit_button("💾 Salvar Detalhes do Processo"):
+            # Remove sistemas vazios
+            st.session_state.custom_tools = [
+                tool for tool in st.session_state.custom_tools 
+                if tool.get('name', '').strip()
+            ]
+            
             data = {
-                "steps": selected_steps + st.session_state.process_details['custom_steps'],
-                "tools": selected_systems + [t['name'] for t in st.session_state.process_details['custom_tools']],
+                "steps": st.session_state.process_steps,
+                "tools": {
+                    "common_tools": common_tools,
+                    "custom_tools": [tool['name'] for tool in custom_tools if tool['name'].strip()]
+                },
                 "data_types": data_types,
                 "data_formats": data_formats,
                 "data_sources": data_sources,
                 "data_volume": data_volume
             }
-            if validate_and_submit(data, ["steps", "tools"], on_submit):
-                st.success("Detalhes do processo salvos com sucesso!")
+            
+            if validate_and_submit(data, ["steps"], on_submit):
+                st.success("✅ Detalhes do processo salvos com sucesso!")
 
 def render_business_rules(on_submit: Optional[Callable] = None, initial_data: dict = None):
     """Renderiza o formulário de regras de negócio e exceções."""

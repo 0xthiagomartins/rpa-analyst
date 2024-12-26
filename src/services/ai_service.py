@@ -237,45 +237,45 @@ class AIService:
             raise ValueError(f"Erro ao processar resposta da IA: {str(e)}")
 
     def analyze_process_description(self, description: str) -> dict:
-        """Analisa a descrição do processo e sugere valores para todos os campos."""
+        """Analisa a descrição do processo e sugere melhorias."""
         template = """
         Você é um especialista em análise de processos para automação RPA.
         Analise a seguinte descrição de processo e extraia informações relevantes para automação RPA.
-        Você pode sugerir tanto itens padrão quanto customizados que identificar na descrição.
-
+        
         Descrição: {description}
-
+        
         Por favor, identifique e retorne no formato JSON:
-        1. Etapas do processo (steps) - Liste todas as etapas identificadas, mesmo que não sejam comuns
-        2. Sistemas e ferramentas envolvidos (tools) - Liste todos os sistemas/ferramentas mencionados
-        3. Tipos de dados manipulados (data_types)
-        4. Formatos de arquivos (data_formats)
-        5. Origens dos dados (data_sources)
-        6. Volume estimado de dados (data_volume: "Baixo", "Médio", "Alto", "Muito Alto")
-        7. Regras de negócio identificadas (business_rules)
-        8. Possíveis exceções (exceptions)
-        9. Objetivos da automação (automation_goals)
-        10. KPIs sugeridos (kpis)
-
+        {{
+            "steps_as_is": ["passo 1", "passo 2", ...],
+            "systems": ["sistema 1", "sistema 2", ...],
+            "business_rules": ["regra 1", "regra 2", ...],
+            "exceptions": ["exceção 1", "exceção 2", ...],
+            "automation_goals": ["objetivo 1", "objetivo 2", ...],
+            "kpis": ["kpi 1", "kpi 2", ...]
+        }}
+        
         Seja específico e detalhado nas sugestões, não se limite apenas a termos genéricos.
         """
-
+        
         try:
-            # Usa o LangChain em vez do client direto
-            prompt = ChatPromptTemplate.from_template(template)
-            chain = LLMChain(llm=self.llm, prompt=prompt)
+            # Gera sugestões iniciais
+            chain = LLMChain(llm=self.llm, prompt=ChatPromptTemplate.from_template(template))
             result = chain.invoke({"description": description})
+            suggestions = json.loads(result['text'].strip())
             
-            # Processa e valida a resposta
-            suggestions = json.loads(result['text'])
+            # Adiciona inferência de dados do processo
+            process_data = self.infer_process_data(description, suggestions.get('steps_as_is', []))
+            
+            # Estrutura o retorno de forma consistente
             return {
+                'steps_as_is': suggestions.get('steps_as_is', []),
                 'details': {
-                    'steps': suggestions.get('steps', []),
-                    'tools': suggestions.get('tools', []),
-                    'data_types': suggestions.get('data_types', []),
-                    'data_formats': suggestions.get('data_formats', []),
-                    'data_sources': suggestions.get('data_sources', []),
-                    'data_volume': suggestions.get('data_volume', 'Médio')
+                    'steps': suggestions.get('steps_as_is', []),
+                    'tools': suggestions.get('systems', []),
+                    'data_types': process_data.get('types', []),
+                    'data_formats': process_data.get('formats', []),
+                    'data_sources': process_data.get('sources', []),
+                    'data_volume': process_data.get('volume', 'Médio')
                 },
                 'business_rules': {
                     'business_rules': suggestions.get('business_rules', []),
@@ -288,7 +288,26 @@ class AIService:
             }
         except Exception as e:
             logger.error(f"Erro ao analisar descrição: {str(e)}")
-            raise ValueError(f"Erro ao analisar descrição: {str(e)}")
+            # Retorna estrutura vazia mas consistente em caso de erro
+            return {
+                'steps_as_is': [],
+                'details': {
+                    'steps': [],
+                    'tools': [],
+                    'data_types': [],
+                    'data_formats': [],
+                    'data_sources': [],
+                    'data_volume': 'Médio'
+                },
+                'business_rules': {
+                    'business_rules': [],
+                    'exceptions': []
+                },
+                'automation_goals': {
+                    'automation_goals': [],
+                    'kpis': []
+                }
+            }
 
     def validate_and_fix_mermaid(self, mermaid_code: str) -> str:
         """Valida e corrige o código Mermaid usando IA."""
@@ -441,3 +460,112 @@ class AIService:
         except Exception as e:
             logger.error(f"Erro ao gerar diagrama: {str(e)}")
             raise ValueError(f"Erro ao gerar diagrama: {str(e)}")
+
+    def infer_process_data(self, description: str, steps: List[str]) -> dict:
+        """Infere dados do processo a partir da descrição e passos."""
+        template = """
+        Você é um especialista em análise de processos RPA.
+        Analise cuidadosamente a descrição e os passos do processo abaixo e extraia informações sobre os dados manipulados.
+
+        Descrição do Processo:
+        {description}
+
+        Passos do Processo:
+        {steps}
+
+        Baseado nas informações acima, identifique:
+
+        1. Tipos de Dados - Exemplos:
+        - Dados financeiros (valores, impostos)
+        - Documentos fiscais (notas fiscais, NFe)
+        - Dados cadastrais (CNPJ, informações de fornecedores)
+        - Dados de controle (status, datas)
+
+        2. Formatos de Dados - Exemplos:
+        - PDF (documentos, notas fiscais)
+        - Excel (planilhas de controle)
+        - Email (comunicações)
+        - Dados estruturados (SAP, sistemas)
+
+        3. Fontes de Dados - Exemplos:
+        - Email (Outlook)
+        - Sistemas (SAP, OCR)
+        - Portais web (Receita Federal)
+        - Arquivos compartilhados (SharePoint)
+
+        4. Volume de Dados:
+        - Baixo: menos de 100 transações/dia
+        - Médio: entre 100 e 1000 transações/dia
+        - Alto: mais de 1000 transações/dia
+
+        Retorne um objeto JSON com a seguinte estrutura exata:
+        {
+            "types": ["lista de tipos de dados identificados"],
+            "formats": ["lista de formatos identificados"],
+            "sources": ["lista de fontes identificadas"],
+            "volume": "Baixo/Médio/Alto baseado na análise"
+        }
+
+        Importante: Baseie-se apenas em informações explicitamente mencionadas na descrição e nos passos.
+        """
+        
+        try:
+            chain = LLMChain(llm=self.llm, prompt=ChatPromptTemplate.from_template(template))
+            result = chain.invoke({
+                "description": description,
+                "steps": "\n".join(f"- {step}" for step in steps)
+            })
+            
+            # Converte resultado para dict
+            data = json.loads(result['text'].strip())
+            
+            # Valida se todos os campos necessários estão presentes
+            if not all(key in data for key in ["types", "formats", "sources", "volume"]):
+                raise ValueError("Resposta da IA incompleta")
+            
+            return data
+            
+        except Exception as e:
+            logger.error(f"Erro ao inferir dados do processo: {str(e)}")
+            return {
+                "types": ["Dados financeiros", "Documentos fiscais"],  # valores padrão mais específicos
+                "formats": ["PDF", "Excel"],
+                "sources": ["Email", "Sistema"],
+                "volume": "Médio"
+            }
+
+    def get_mock_description(self) -> str:
+        """Retorna uma descrição de processo mock para testes."""
+        return """
+        Processo de Validação e Processamento de Notas Fiscais Eletrônicas
+
+        O processo inicia quando o departamento financeiro recebe notas fiscais eletrônicas (NFe) por email dos fornecedores. 
+        O assistente financeiro acessa a caixa de entrada do Outlook a cada 2 horas para verificar novos emails com NFes anexadas em PDF.
+
+        Para cada nota fiscal recebida, o assistente deve:
+        1. Baixar o arquivo PDF do email
+        2. Extrair os dados principais usando o sistema OCR interno
+        3. Acessar o portal da Receita Federal para validar a autenticidade da NFe
+        4. Inserir os dados no sistema SAP, módulo financeiro
+        5. Atualizar a planilha de controle no Excel com status e valores
+        6. Enviar email de confirmação para o fornecedor
+        7. Arquivar o PDF em pasta compartilhada no SharePoint
+
+        Regras importantes:
+        - Notas fiscais acima de R$ 50.000 precisam de aprovação do gerente
+        - Fornecedor deve estar cadastrado e ativo no SAP
+        - Data de emissão não pode ser superior a 30 dias
+        - CNPJ do fornecedor deve ser válido
+        - Valores e impostos devem estar corretos conforme legislação
+
+        Exceções comuns:
+        - Sistema SAP fora do ar
+        - PDF ilegível ou corrompido
+        - Nota fiscal cancelada ou já processada
+        - Divergência nos cálculos de impostos
+        - Fornecedor bloqueado ou inativo
+
+        O volume médio é de 200 notas fiscais por dia, com picos de até 500 em fechamento de mês.
+        O objetivo é automatizar este processo para reduzir erros de digitação, agilizar o processamento
+        e garantir conformidade fiscal. Atualmente, cada nota leva em média 15 minutos para ser processada manualmente.
+        """

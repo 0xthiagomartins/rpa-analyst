@@ -155,7 +155,10 @@ def prepare_pdd_data() -> dict:
         
         # Objetivos e KPIs
         "automation_goals": form_data["automation_goals"].get("automation_goals", ""),
-        "kpis": form_data["automation_goals"].get("kpis", "")
+        "kpis": form_data["automation_goals"].get("kpis", ""),
+        
+        # Adiciona o código do diagrama se existir
+        "diagram_code": st.session_state.get('diagram_code', None)
     }
     
     return pdd_data
