@@ -323,6 +323,40 @@ class AIService:
             logger.error(f"Erro ao corrigir diagrama: {str(e)}")
             return mermaid_code
 
+    def format_node_text(self, text: str, max_length: int = 25) -> str:
+        """Formata o texto do nó para melhor visualização."""
+        # Remove espaços extras
+        text = ' '.join(text.split())
+        
+        # Se o texto é menor que o limite, retorna direto
+        if len(text) <= max_length:
+            return text
+        
+        # Divide em palavras
+        words = text.split()
+        lines = []
+        current_line = []
+        current_length = 0
+        
+        for word in words:
+            # Verifica se adicionar a palavra excede o limite
+            if current_length + len(word) + 1 <= max_length:
+                current_line.append(word)
+                current_length += len(word) + 1
+            else:
+                # Salva linha atual e começa nova linha
+                if current_line:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+                current_length = len(word)
+        
+        # Adiciona última linha
+        if current_line:
+            lines.append(' '.join(current_line))
+        
+        # Retorna texto com quebras de linha
+        return '<br>'.join(lines)
+
     def generate_process_diagram(self, process_data: dict) -> str:
         """Gera um diagrama Mermaid baseado nos dados do processo."""
         template = """
@@ -361,12 +395,17 @@ class AIService:
            style acao fill:#bbdefb,stroke:#333
            style decisao fill:#fff59d,stroke:#333
            style sistema fill:#c8e6c9,stroke:#333
+        7. Formatação do texto:
+           - Use <br> para quebras de linha
+           - Limite cada linha a 25 caracteres
+           - Mantenha textos concisos
+           - Use 2-3 linhas no máximo por nó
         
         Exemplo de código correto:
         flowchart TD
             inicio((Início))
-            validar{{Validar Dados}}
-            processar[Processar]
+            validar{{Validar<br>Dados}}
+            processar[Processar<br>Informações]
             sistema[(CRM)]
             fim((Fim))
 
@@ -390,9 +429,9 @@ class AIService:
             result = chain.invoke({
                 "process_name": process_data.get('process_name', ''),
                 "description": process_data.get('process_description', ''),
-                "steps": "\n".join(f"- {step}" for step in process_data.get('steps_as_is', [])),
-                "systems": "\n".join(f"- {system}" for system in process_data.get('systems', [])),
-                "rules": "\n".join(f"- {rule}" for rule in process_data.get('business_rules', []))
+                "steps": "\n".join(f"- {self.format_node_text(step)}" for step in process_data.get('steps_as_is', [])),
+                "systems": "\n".join(f"- {self.format_node_text(system)}" for system in process_data.get('systems', [])),
+                "rules": "\n".join(f"- {self.format_node_text(rule)}" for rule in process_data.get('business_rules', []))
             })
             
             # Limpa e valida o código gerado
