@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List, Dict
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
-from langchain.chains import LLMChain
+from langchain.schema.runnable import RunnableSequence
 import json
 import logging
 from src.utils.diagram_validator import DiagramValidator
@@ -241,24 +241,71 @@ class AIService:
 
     def analyze_process_description(self, description: str) -> dict:
         """Analisa a descrição do processo e retorna sugestões estruturadas."""
-        try:
-            # Template atualizado e corrigido
-            template = """Você é um especialista em análise de processos RPA.
-Analise a descrição do processo abaixo e extraia informações estruturadas.
+        template = """Você é um especialista em análise de processos RPA.
+Analise o processo descrito e identifique:
+1. Etapas do processo e seus tipos
+2. Conexões e fluxos lógicos
+3. Sistemas e ferramentas utilizados
+4. Dados manipulados
+5. Regras e exceções
+6. Objetivos e KPIs
 
 Descrição do Processo:
 {description}
 
-Ao analisar o processo, considere as seguintes regras de validação do diagrama:
-1. Deve haver exatamente um ponto de início
-2. Deve haver pelo menos um ponto de fim
-3. Todos os nós devem estar conectados
-4. Não deve haver ciclos que causem loops infinitos
-5. Todas as conexões devem ser entre nós existentes
-
-Retorne um objeto JSON com a seguinte estrutura, sem texto adicional:
+Retorne um objeto JSON com a seguinte estrutura exata, sem texto adicional:
 {{
-    "steps_as_is": ["lista ordenada de etapas"],
+    "steps": [
+        {{
+            "id": "node_0",
+            "name": "nome da etapa",
+            "type": "start|action|decision|system|end",
+            "description": "descrição detalhada",
+            "system": "nome do sistema (se aplicável)",
+            "expected_time": "tempo estimado (opcional)"
+        }}
+    ],
+    "connections": [
+        {{
+            "source": "node_id",
+            "target": "node_id",
+            "type": "sequential|conditional|loop",
+            "label": "descrição da conexão",
+            "condition": "condição para decisões",
+            "reasoning": "justificativa da conexão"
+        }}
+    ],
+    "process_analysis": {{
+        "start_node": "node_id",
+        "end_nodes": ["node_ids"],
+        "conditional_paths": [
+            {{
+                "decision_node": "node_id",
+                "conditions": [
+                    {{
+                        "target": "node_id",
+                        "condition": "descrição da condição",
+                        "default": false
+                    }}
+                ]
+            }}
+        ],
+        "systems_involved": [
+            {{
+                "name": "nome do sistema",
+                "steps": ["node_ids"],
+                "purpose": "propósito do sistema no processo"
+            }}
+        ],
+        "loops": [
+            {{
+                "start_node": "node_id",
+                "end_node": "node_id",
+                "condition": "condição do loop",
+                "steps_involved": ["node_ids"]
+            }}
+        ]
+    }},
     "details": {{
         "steps": ["lista detalhada de etapas"],
         "tools": ["sistemas e ferramentas identificados"],
@@ -274,40 +321,74 @@ Retorne um objeto JSON com a seguinte estrutura, sem texto adicional:
     "automation_goals": {{
         "automation_goals": ["objetivos da automação"],
         "kpis": ["KPIs sugeridos"]
-    }},
-    "diagram_validation": {{
-        "start_node": "identificador do nó inicial",
-        "end_nodes": ["identificadores dos nós finais"],
-        "connections": [{{"source": "id_origem", "target": "id_destino"}}]
     }}
 }}"""
-            # Executa a análise
-            chain = LLMChain(
-                llm=self.llm,
-                prompt=ChatPromptTemplate.from_template(template)
-            )
+
+        try:
+            # Usa RunnableSequence em vez de LLMChain
+            prompt = ChatPromptTemplate.from_template(template)
+            chain = prompt | self.llm
             
             result = chain.invoke({"description": description})
             
             # Processa e valida o resultado
-            data = self._process_ai_response(result['text'])
+            data = self._process_ai_response(result.content)
             
-            # Valida o diagrama sugerido
-            if 'diagram_validation' in data:
-                nodes = self._convert_steps_to_nodes(data['steps_as_is'])
-                edges = data['diagram_validation'].get('connections', [])
-                
-                is_valid, errors = self.diagram_validator.validate_diagram(nodes, edges)
-                if not is_valid:
-                    logger.warning(f"Diagrama sugerido tem problemas: {errors}")
-                    # Tenta corrigir o diagrama
-                    data = self._fix_diagram_issues(data, errors)
+            # Garante que os IDs dos nós são únicos e sequenciais
+            if 'steps' in data:
+                for i, step in enumerate(data['steps']):
+                    old_id = step['id']
+                    new_id = f'node_{i}'
+                    step['id'] = new_id
+                    
+                    # Atualiza referências nas conexões
+                    if 'connections' in data:
+                        for conn in data['connections']:
+                            if conn['source'] == old_id:
+                                conn['source'] = new_id
+                            if conn['target'] == old_id:
+                                conn['target'] = new_id
+                    
+                    # Atualiza referências na análise do processo
+                    if 'process_analysis' in data:
+                        if data['process_analysis']['start_node'] == old_id:
+                            data['process_analysis']['start_node'] = new_id
+                        if old_id in data['process_analysis']['end_nodes']:
+                            data['process_analysis']['end_nodes'] = [
+                                new_id if x == old_id else x 
+                                for x in data['process_analysis']['end_nodes']
+                            ]
             
             return data
             
         except Exception as e:
-            logger.error(f"Erro ao analisar descrição: {str(e)}")
-            return {}
+            logger.error(f"Erro ao analisar processo: {str(e)}")
+            # Retorna estrutura mínima em caso de erro
+            return {
+                "steps": [],
+                "connections": [],
+                "process_analysis": {
+                    "start_node": None,
+                    "end_nodes": [],
+                    "conditional_paths": []
+                },
+                "details": {
+                    "steps": [],
+                    "tools": [],
+                    "data_types": [],
+                    "data_formats": [],
+                    "data_sources": [],
+                    "data_volume": "Não especificado"
+                },
+                "business_rules": {
+                    "business_rules": [],
+                    "exceptions": []
+                },
+                "automation_goals": {
+                    "automation_goals": [],
+                    "kpis": []
+                }
+            }
 
     def _convert_steps_to_nodes(self, steps: List[str]) -> List[Dict]:
         """Converte lista de etapas em nós do diagrama."""
@@ -321,33 +402,45 @@ Retorne um objeto JSON com a seguinte estrutura, sem texto adicional:
             for i, step in enumerate(steps)
         ]
 
-    def _fix_diagram_issues(self, data: Dict, errors: List[str]) -> Dict:
-        """Tenta corrigir problemas identificados no diagrama."""
-        steps = data['steps_as_is']
-        
-        # Garante nó inicial
-        if "nó de início" in " ".join(errors):
-            if steps:
-                steps.insert(0, "Início do processo")
-        
-        # Garante nó final
-        if "nó de fim" in " ".join(errors):
-            steps.append("Fim do processo")
-        
-        # Atualiza conexões
-        connections = []
-        for i in range(len(steps)-1):
-            connections.append({
-                'source': f"step_{i}",
-                'target': f"step_{i+1}"
+    def _fix_diagram_issues(self, data: dict, errors: List[str]) -> dict:
+        """Corrige problemas comuns no diagrama sugerido."""
+        # Garante que existe um nó inicial
+        if not any(step['type'] == 'start' for step in data['steps']):
+            data['steps'].insert(0, {
+                'id': 'node_start',
+                'name': 'Início do Processo',
+                'type': 'start',
+                'description': 'Ponto de início do processo'
             })
+            
+            # Conecta ao primeiro nó
+            if data['steps'][1:]:
+                data['connections'].insert(0, {
+                    'source': 'node_start',
+                    'target': data['steps'][1]['id'],
+                    'type': 'sequential',
+                    'label': 'inicia'
+                })
         
-        # Atualiza o diagrama validado
-        data['diagram_validation'] = {
-            'start_node': "step_0",
-            'end_nodes': [f"step_{len(steps)-1}"],
-            'connections': connections
-        }
+        # Garante que existe um nó final
+        if not any(step['type'] == 'end' for step in data['steps']):
+            end_node = {
+                'id': 'node_end',
+                'name': 'Fim do Processo',
+                'type': 'end',
+                'description': 'Ponto de término do processo'
+            }
+            data['steps'].append(end_node)
+            
+            # Conecta últimos nós sem saída ao fim
+            for step in data['steps'][:-1]:
+                if not any(conn['source'] == step['id'] for conn in data['connections']):
+                    data['connections'].append({
+                        'source': step['id'],
+                        'target': 'node_end',
+                        'type': 'sequential',
+                        'label': 'finaliza'
+                    })
         
         return data
 
@@ -363,16 +456,40 @@ Retorne um objeto JSON com a seguinte estrutura, sem texto adicional:
             json_str = response[start_idx:end_idx]
             data = json.loads(json_str)
             
-            # Validação básica dos campos
-            required_fields = ["steps_as_is", "details", "business_rules", "automation_goals"]
-            if not all(field in data for field in required_fields):
-                raise ValueError("Campos obrigatórios ausentes na resposta")
+            # Garante estrutura mínima
+            if 'steps' not in data:
+                data['steps'] = []
+            if 'connections' not in data:
+                data['connections'] = []
+            if 'process_analysis' not in data:
+                data['process_analysis'] = {
+                    'start_node': None,
+                    'end_nodes': [],
+                    'conditional_paths': []
+                }
+            
+            # Validação da estrutura dos steps
+            for step in data['steps']:
+                if not all(field in step for field in ['id', 'name', 'type']):
+                    step.update({
+                        'id': f"node_{len(data['steps'])}",
+                        'name': step.get('name', 'Nova Etapa'),
+                        'type': step.get('type', 'action')
+                    })
             
             return data
             
         except Exception as e:
             logger.error(f"Erro ao processar resposta da IA: {str(e)}")
-            raise
+            return {
+                "steps": [],
+                "connections": [],
+                "process_analysis": {
+                    "start_node": None,
+                    "end_nodes": [],
+                    "conditional_paths": []
+                }
+            }
 
     def validate_and_fix_mermaid(self, mermaid_code: str) -> str:
         """Valida e corrige o código Mermaid usando IA."""
