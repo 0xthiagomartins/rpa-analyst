@@ -435,7 +435,7 @@ def render_process_identification(on_submit: Optional[Callable] = None, initial_
             except Exception as e:
                 st.error(f"Erro ao analisar descrição: {str(e)}")
             
-            st.success("Informações salvas com sucesso!")
+                st.success("Informações salvas com sucesso!")
 
     # Mostra sugestões da IA fora do formulário, apenas se existirem
     if 'ai_suggestions' in st.session_state and st.session_state.ai_suggestions:
@@ -494,147 +494,179 @@ def render_step_card(step: dict, on_edit: callable, on_delete: callable):
     .step-card {
         border: 1px solid #ddd;
         border-radius: 8px;
-        padding: 10px;
-        margin: 5px 0;
+        padding: 15px;
+        margin: 10px 0;
         background-color: #f8f9fa;
+        position: relative;
+        transition: all 0.3s ease;
+    }
+    .step-card:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .step-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    .step-title {
+        font-size: 1.1em;
+        font-weight: 500;
     }
     .step-type {
         font-size: 0.8em;
-        padding: 2px 8px;
+        padding: 3px 10px;
         border-radius: 12px;
         margin-left: 8px;
         color: white;
+        display: inline-block;
     }
     .step-time {
-        float: right;
         color: #666;
         font-size: 0.8em;
+        margin-left: auto;
     }
     .step-description {
         color: #666;
-        font-size: 0.9em;
-        margin-top: 5px;
+        font-size: 0.95em;
+        margin: 8px 0;
+        line-height: 1.4;
     }
-    .step-dependencies {
-        font-size: 0.8em;
-        color: #666;
-        margin-top: 5px;
+    .step-system {
+        background-color: #e9ecef;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 0.9em;
+        margin-top: 8px;
+    }
+    .step-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 10px;
+        padding-top: 8px;
         border-top: 1px solid #eee;
-        padding-top: 5px;
+    }
+    .step-edit-panel {
+        margin-top: 15px;
+        padding: 15px;
+        background-color: white;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
     }
     </style>
     """, unsafe_allow_html=True)
 
     # Mapeamento de tipos para ícones e cores
     type_styles = {
-        'start': {'icon': '🟢', 'color': '#28a745'},
-        'action': {'icon': '▶️', 'color': '#007bff'},
-        'decision': {'icon': '💠', 'color': '#ffc107'},
-        'system': {'icon': '🖥️', 'color': '#17a2b8'},
-        'end': {'icon': '🔴', 'color': '#dc3545'}
+        'start': {'icon': '🟢', 'color': '#28a745', 'label': 'Início'},
+        'action': {'icon': '▶️', 'color': '#007bff', 'label': 'Ação'},
+        'decision': {'icon': '💠', 'color': '#ffc107', 'label': 'Decisão'},
+        'system': {'icon': '🖥️', 'color': '#17a2b8', 'label': 'Sistema'},
+        'end': {'icon': '🔴', 'color': '#dc3545', 'label': 'Fim'}
     }
 
     step_type = step.get('type', 'action')
-    style = type_styles.get(step_type, {'icon': '▶️', 'color': '#6c757d'})
+    style = type_styles.get(step_type, {'icon': '▶️', 'color': '#6c757d', 'label': 'Ação'})
 
-    st.markdown(f"""
-    <div class="step-card">
-        <div>
-            <strong>{style['icon']} {step['name']}</strong>
-            <span class="step-type" style="background-color: {style['color']};">
-                {step_type.upper()}
-            </span>
-            <span class="step-time">⏱️ {step.get('expected_time', 'N/A')}</span>
-        </div>
-        <div class="step-description">
-            📝 {step.get('description', 'Sem descrição')}
-            {f'<br>🔧 Sistema: {step["system"]}' if step.get('system') else '<div>'}
-        </div>
-        {f'''
-        <div class="step-dependencies">
-            📎 Depende de: {', '.join(step.get('dependencies', []))}
-        </div>
-        ''' if step.get('dependencies') else ''}
-    </div>
-    """, unsafe_allow_html=True)
+    # Container principal do card
+    with st.container():
+        # Layout em colunas para o card e botão de excluir
+        col1, col2 = st.columns([20, 1])
+        
+        with col1:
+            # Cabeçalho e informações principais
+            st.markdown(f"""
+            <div class="step-card">
+                <div class="step-header">
+                    <span class="step-title">
+                        {style['icon']} {step['name']}
+                    </span>
+                    <span class="step-type" style="background-color: {style['color']};">
+                        {style['label']}
+                    </span>
+                    <span class="step-time">⏱️ {step.get('expected_time', 'N/A')}</span>
+                </div>
+                <div class="step-description">
+                    📝 {step.get('description', 'Sem descrição')}
+                </div>
+                {f'''
+<div class="step-system">
+    🔧 Sistema: {step["system"]}
+</div>
+                ''' if step.get('system') else ''}
+</div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            # Botão de excluir alinhado verticalmente com o card
+            if st.button("🗑️", key=f"delete_{step['id']}", help="Excluir etapa"):
+                on_delete(step['id'])
 
-    # Botões de ação
-    col1, col2 = st.columns([6, 1])
-    with col2:
-        if st.button("🗑️", key=f"delete_{step['id']}", help="Remover esta etapa"):
-            on_delete(step['id'])
+        # Painel de edição
+        with st.expander("✏️ Editar Etapa", expanded=False):
+            with st.form(f"edit_step_{step['id']}", clear_on_submit=False):
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    new_name = st.text_input(
+                        "Nome da Etapa *",
+                        value=step['name'],
+                        help="Nome descritivo da etapa"
+                    )
+                
+                with col2:
+                    type_options = {
+                        'Início': 'start',
+                        'Ação': 'action',
+                        'Decisão': 'decision',
+                        'Sistema': 'system',
+                        'Fim': 'end'
+                    }
+                    current_type = next(
+                        (k for k, v in type_options.items() if v == step['type']),
+                        'Ação'
+                    )
+                    new_type = st.selectbox(
+                        "Tipo *",
+                        options=list(type_options.keys()),
+                        index=list(type_options.keys()).index(current_type)
+                    )
 
-    # Painel de edição expandível
-    with st.expander("✏️ Editar", expanded=False):
-        # Nome da etapa
-        new_name = st.text_input(
-            "Nome da Etapa *",
-            value=step['name'],
-            key=f"edit_name_{step['id']}",
-            help="Nome descritivo da etapa (máx. 100 caracteres)"
-        )
+                new_description = st.text_area(
+                    "Descrição",
+                    value=step.get('description', ''),
+                    help="Descrição detalhada da etapa",
+                    height=100
+                )
 
-        # Tipo da etapa
-        type_options = {
-            'Ação': 'action',
-            'Decisão': 'decision',
-            'Sistema': 'system',
-            'Início': 'start',
-            'Fim': 'end'
-        }
-        current_type = next(
-            (pt for pt, en in type_options.items() if en == step['type']),
-            'Ação'
-        )
-        new_type = st.selectbox(
-            "Tipo *",
-            options=list(type_options.keys()),
-            index=list(type_options.keys()).index(current_type),
-            key=f"edit_type_{step['id']}",
-            help="Tipo de operação realizada nesta etapa"
-        )
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_system = st.text_input(
+                        "Sistema",
+                        value=step.get('system', ''),
+                        help="Sistema utilizado (se aplicável)"
+                    )
+                
+                with col2:
+                    new_time = st.text_input(
+                        "Tempo Estimado",
+                        value=step.get('expected_time', ''),
+                        help="Ex: 5 minutos, 1 hora"
+                    )
 
-        # Descrição
-        new_description = st.text_area(
-            "Descrição",
-            value=step.get('description', ''),
-            key=f"edit_desc_{step['id']}",
-            help="Descrição detalhada da etapa",
-            max_chars=500
-        )
-
-        # Sistema (se aplicável)
-        if type_options[new_type] == 'system':
-            new_system = st.text_input(
-                "Sistema",
-                value=step.get('system', ''),
-                key=f"edit_system_{step['id']}",
-                help="Nome do sistema utilizado"
-            )
-        else:
-            new_system = None
-
-        # Tempo estimado
-        new_time = st.text_input(
-            "Tempo Estimado",
-            value=step.get('expected_time', ''),
-            key=f"edit_time_{step['id']}",
-            help="Ex: 5 minutos, 1 hora"
-        )
-
-        # Botão de salvar
-        if st.button("💾 Salvar Alterações", key=f"save_{step['id']}"):
-            step.update({
-                'name': new_name,
-                'type': type_options[new_type],
-                'description': new_description,
-                'expected_time': new_time,
-                'updated_at': datetime.now().isoformat()
-            })
-            if new_system is not None:
-                step['system'] = new_system
-            st.success("Alterações salvas!")
-            st.rerun()
+                # Botões de ação do formulário
+                if st.form_submit_button("💾 Salvar", use_container_width=True, type="primary"):
+                    step.update({
+                        'name': new_name,
+                        'type': type_options[new_type],
+                        'description': new_description,
+                        'system': new_system,
+                        'expected_time': new_time,
+                        'updated_at': datetime.now().isoformat()
+                    })
+                    st.success("✅ Alterações salvas!")
+                    st.rerun()
 
 def render_tool_card(i: int, tool: dict, on_delete: Callable):
     """Renderiza um card para uma ferramenta/sistema customizado."""
@@ -735,7 +767,7 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
         for step in st.session_state.process_steps:
             render_step_card(
                 step,
-                on_edit=lambda id: None,
+                on_edit=lambda id: st.session_state.update({'editing_step': id}),
                 on_delete=lambda id: st.session_state.process_steps.remove(
                     next(s for s in st.session_state.process_steps if s['id'] == id)
                 )
@@ -822,13 +854,6 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
         with col1:
             st.write("**Tipos e Formatos**")
             
-            # Mostra sugestões da IA
-            if suggested_data_types:
-                st.info("🤖 Sugestões da IA:")
-                for dtype in suggested_data_types:
-                    st.write(f"• {dtype}")
-                st.divider()
-            
             data_types = st.multiselect(
                 "Tipos de Dados:",
                 options=all_data_types,
@@ -836,12 +861,6 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
                 help="Tipos de dados manipulados no processo"
             )
             
-            # Mostra sugestões da IA
-            if suggested_data_formats:
-                st.info("🤖 Sugestões da IA:")
-                for fmt in suggested_data_formats:
-                    st.write(f"• {fmt}")
-                st.divider()
             
             data_formats = st.multiselect(
                 "Formatos de Dados:",
@@ -852,13 +871,6 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
         
         with col2:
             st.write("**Fontes e Volume**")
-            
-            # Mostra sugestões da IA
-            if suggested_data_sources:
-                st.info("🤖 Sugestões da IA:")
-                for src in suggested_data_sources:
-                    st.write(f"• {src}")
-                st.divider()
             
             data_sources = st.multiselect(
                 "Fontes de Dados:",
