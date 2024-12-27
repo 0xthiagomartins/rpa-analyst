@@ -1,64 +1,78 @@
-# TODO List 📝
+# TODO List
 
-## Melhorias na Estrutura do JSON de Análise
+## Concluído ✅
+- [x] Formulário de identificação do processo
+- [x] Integração com IA para análise
+- [x] Sistema de sugestões automáticas
+- [x] Debug detalhado
+- [x] Validação de campos
+- [x] Gerenciamento básico de estado
+- [x] Inferência de tipos de etapas
+- [x] Formalização de descrição
+- [x] Organização de Passos
+  - [x] Agrupamento de passos em fases
+  - [x] Metadados para cada fase
+  - [x] Visualização hierárquica
+- [x] Estruturação com IDs
+  - [x] IDs únicos para passos
+  - [x] Referências cruzadas
+  - [x] Sistema de rastreamento
+- [x] Fluxo de Dependências
+  - [x] Visualização de dependências
+  - [x] Validação de dependências circulares
+  - [x] Interface de seleção de dependências
 
-### 1. ✅ Organização de Passos
-- [x] Implementar agrupamento de passos em fases
-- [x] Adicionar metadados para cada fase
-- [x] Criar visualização hierárquica no frontend
+## Em Progresso 🚧
+- [ ] Visualização do diagrama do processo
+- [ ] Editor visual de diagrama
+- [ ] Validação completa das etapas
+- [ ] Persistência dos dados
+- [ ] Feedback Visual
+  - [ ] Animações de transição
+  - [ ] Indicadores de estado
+  - [ ] Tooltips informativos
+  - [ ] Ícones contextuais
+  - [ ] Layout responsivo
 
-### 2. ✅ Estruturação com IDs
-- [x] Implementar IDs únicos para passos
-- [x] Criar referências cruzadas
-- [x] Desenvolver sistema de rastreamento
+## Pendente 📝
+- [ ] Exportação para PDF
+- [ ] Histórico de versões
+- [ ] Sistema de templates
+- [ ] Preview do documento final
+- [ ] Validação de regras de negócio
+- [ ] Melhorias na UI/UX
+  - [ ] Feedback visual mais claro
+  - [ ] Tooltips explicativos
+  - [ ] Temas consistentes
+- [ ] Testes automatizados
+  - [ ] Testes unitários
+  - [ ] Testes de integração
+  - [ ] Testes de UI
+- [ ] Documentação
+  - [ ] Guia do usuário
+  - [ ] Documentação técnica
+  - [ ] Exemplos de uso
+- [ ] Segurança e Compliance
+  - [ ] Requisitos de segurança
+  - [ ] Aspectos de compliance
+  - [ ] Checklist de validação
+- [ ] Autenticação e Permissões
+  - [ ] Requisitos de acesso
+  - [ ] Níveis de permissão
+  - [ ] Logs de auditoria
+- [ ] KPIs e Monitoramento
+  - [ ] Métricas específicas
+  - [ ] Fórmulas de cálculo
+  - [ ] Dashboard de monitoramento
+- [ ] Responsabilidades
+  - [ ] Campo de responsável por etapa
+  - [ ] Matriz de responsabilidades
+  - [ ] Notificações por papel
 
-### 3. ✅ Fluxo de Dependências
-- [x] Visualização de dependências
-- [x] Validação de dependências circulares
-- [x] Interface de seleção de dependências
-
-### 4. 🔄 Feedback Visual (Em Progresso)
-- [ ] Adicionar animações de transição
-- [ ] Melhorar indicadores de estado
-- [ ] Implementar tooltips informativos
-- [ ] Adicionar ícones contextuais
-- [ ] Melhorar layout responsivo
-
-### 5. Pré-requisitos e Condições
-- [ ] Adicionar seção de pré-requisitos
-- [ ] Incluir validações de ambiente
-- [ ] Documentar dependências técnicas
-
-### 6. Segurança e Compliance
-- [ ] Adicionar seção de requisitos de segurança
-- [ ] Documentar aspectos de compliance
-- [ ] Incluir checklist de validação
-
-### 7. Autenticação e Permissões
-- [ ] Detalhar requisitos de acesso
-- [ ] Documentar níveis de permissão
-- [ ] Incluir logs de auditoria
-
-### 8. Formatos de Saída
-- [ ] Documentar todos os outputs esperados
-- [ ] Especificar formatos de arquivo
-- [ ] Incluir exemplos de saída
-
-### 9. KPIs Detalhados
-- [ ] Adicionar métricas específicas
-- [ ] Documentar fórmulas de cálculo
-- [ ] Implementar dashboard de monitoramento
-
-### 10. Responsabilidades
-- [ ] Adicionar campo de responsável por etapa
-- [ ] Documentar matriz de responsabilidades
-- [ ] Implementar notificações por papel
-
-## Próximos Passos Imediatos
-1. Finalizar melhorias visuais
-2. Implementar validações em tempo real
-3. Adicionar histórico de alterações
-4. Melhorar documentação
+## Bugs Conhecidos 🐛
+- [ ] Problemas com atualização de estado em alguns componentes
+- [ ] Inconsistências na validação de dados
+- [ ] Problemas de performance com muitas etapas
 
 ## Notas de Implementação
 - Manter compatibilidade com dados existentes
