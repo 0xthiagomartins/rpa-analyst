@@ -216,7 +216,7 @@ técnica profissional:
 
 ## 👥 Autores
 
-* **Seu Nome** - *Trabalho inicial* - [seu-usuario](https://github.com/seu-usuario)
+* **Thiago Martins** - *Trabalho inicial* - [@0xthiagomartins](https://github.com/0xthiagomartins)
 
 ## 🙏 Agradecimentos
 
