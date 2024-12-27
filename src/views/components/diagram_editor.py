@@ -276,18 +276,18 @@ def render_diagram_editor(mermaid_code: str, on_save: Optional[callable] = None)
             {st.session_state.diagram_editor['code']}
             ```
             """)
-            
-            # Botões de ação
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("💾 Salvar Alterações", use_container_width=True):
-                    if on_save:
-                        on_save(st.session_state.diagram_editor['code'])
-                    st.success("Diagrama atualizado com sucesso!")
-            with col2:
-                if st.button("❌ Cancelar", use_container_width=True):
-                    st.session_state.diagram_editor['show_editor'] = False
-                    st.rerun()
+        
+        # Botões de ação
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💾 Salvar Alterações", use_container_width=True):
+                if on_save:
+                    on_save(st.session_state.diagram_editor['code'])
+                st.success("Diagrama atualizado com sucesso!")
+        with col2:
+            if st.button("❌ Cancelar", use_container_width=True):
+                st.session_state.diagram_editor['show_editor'] = False
+                st.rerun()
 
     return st.session_state.diagram_editor['code']
 

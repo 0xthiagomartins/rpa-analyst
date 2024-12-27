@@ -8,12 +8,111 @@ from .description_formalizer import render_description_formalizer
 from src.services.ai_service import AIService
 from streamlit_modal import Modal
 from streamlit_sortables import sort_items
+from datetime import datetime
+
+def get_default_options():
+    """Retorna as opções padrão caso o arquivo de configuração não exista."""
+    return {
+        'common_tools': [
+            'Microsoft Excel',
+            'Microsoft Outlook',
+            'SAP',
+            'Power BI',
+            'SharePoint',
+            'Teams',
+            'Oracle',
+            'Salesforce',
+            'ServiceNow',
+            'Power Automate'
+        ],
+        'data_types': [
+            'Dados financeiros',
+            'Documentos fiscais',
+            'Dados cadastrais',
+            'Dados de controle',
+            'Documentos digitalizados',
+            'Planilhas',
+            'Emails',
+            'Relatórios',
+            'Números de protocolo',
+            'Valores monetários',
+            'Dados de login',
+            'Arquivos PDF'
+        ],
+        'data_formats': [
+            'PDF',
+            'Excel',
+            'Word',
+            'CSV',
+            'TXT',
+            'XML',
+            'JSON',
+            'Email',
+            'Imagem',
+            'Login',
+            'Monetário'
+        ],
+        'data_sources': [
+            'Email',
+            'Sistema interno',
+            'Portal web',
+            'Pasta compartilhada',
+            'Banco de dados',
+            'API',
+            'Planilha',
+            'Scanner'
+        ],
+        'business_rules_templates': [
+            'Validação de dados obrigatórios',
+            'Verificação de duplicidade',
+            'Aprovação por valor',
+            'Verificação de prazo',
+            'Validação de formato',
+            'Checagem de permissões'
+        ],
+        'common_exceptions': [
+            'Sistema indisponível',
+            'Dados inconsistentes',
+            'Arquivo corrompido',
+            'Timeout de operação',
+            'Erro de autenticação',
+            'Permissão negada'
+        ],
+        'automation_goals': [
+            'Redução de tempo de processamento',
+            'Eliminação de erros manuais',
+            'Padronização do processo',
+            'Aumento de produtividade',
+            'Melhoria da qualidade',
+            'Redução de custos'
+        ],
+        'kpi_templates': [
+            'Tempo médio de processamento',
+            'Taxa de erro',
+            'Volume processado',
+            'Custo por transação',
+            'Tempo de resposta',
+            'Satisfação do usuário'
+        ]
+    }
 
 def load_form_options():
     """Carrega as opções predefinidas do formulário."""
-    config_path = Path(__file__).parent.parent.parent.parent / 'config' / 'form_options.yaml'
-    with open(config_path, 'r', encoding='utf-8') as f:
-        return yaml.safe_load(f)
+    try:
+        config_path = Path(__file__).parent.parent.parent.parent / 'config' / 'form_options.yaml'
+        with open(config_path, 'r', encoding='utf-8') as f:
+            options = yaml.safe_load(f)
+            
+        # Verifica se todas as chaves necessárias existem
+        default_options = get_default_options()
+        for key in default_options:
+            if key not in options:
+                options[key] = default_options[key]
+                
+        return options
+    except Exception as e:
+        st.warning(f"Erro ao carregar opções do arquivo: {str(e)}. Usando opções padrão.")
+        return get_default_options()
 
 OPTIONS = load_form_options()
 
@@ -249,17 +348,14 @@ def render_process_identification(on_submit: Optional[Callable] = None, initial_
                 ai_service = AIService()
                 suggestions = ai_service.analyze_process_description(description)
                 st.session_state.ai_suggestions = suggestions
+                st.session_state.suggestions_processed = False  # Reset flag
                 
                 # Mostra opções para aplicar sugestões
                 st.success("Descrição analisada com sucesso!")
                 col1, col2 = st.columns(2)
                 with col1:
                     if st.button("✅ Aplicar Sugestões", use_container_width=True):
-                        # Aplica as sugestões aos dados do formulário
-                        st.session_state.form_data['details'] = suggestions['details']
-                        st.session_state.form_data['business_rules'] = suggestions['business_rules']
-                        st.session_state.form_data['automation_goals'] = suggestions['automation_goals']
-                        st.success("Sugestões aplicadas! Você pode revisar e ajustar nos próximos passos.")
+                        st.session_state.current_step = "details"  # Avança para próxima página
                         st.rerun()
                 with col2:
                     if st.button("❌ Ignorar Sugestões", use_container_width=True):
@@ -282,70 +378,223 @@ def filter_valid_options(suggested_values: List[str], valid_options: List[str]) 
     """Filtra valores sugeridos para incluir apenas opções válidas."""
     return [value for value in suggested_values if value in valid_options]
 
-def render_step_card(i: int, step: dict, on_delete: Callable):
-    """Renderiza um card para uma etapa do processo."""
-    with st.container():
-        st.markdown("""
-        <style>
-        .step-card {
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 10px 0;
-            border-left: 3px solid #1f77b4;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+def validate_step_field(step: dict, field: str, value: any) -> tuple[bool, str]:
+    """Valida um campo específico de uma etapa em tempo real."""
+    if field == 'name':
+        if not value.strip():
+            return False, "Nome da etapa é obrigatório"
+        if len(value) > 100:
+            return False, "Nome deve ter no máximo 100 caracteres"
+        return True, ""
         
-        with st.container():
-            st.markdown(f'<div class="step-card">', unsafe_allow_html=True)
+    elif field == 'type':
+        valid_types = ["action", "decision", "system", "start", "end"]
+        if value not in valid_types:
+            return False, "Tipo de etapa inválido"
+        return True, ""
+        
+    elif field == 'description':
+        if len(value) > 500:
+            return False, "Descrição deve ter no máximo 500 caracteres"
+        return True, ""
+        
+    elif field == 'sla':
+        if value:
+            sla = value.lower()
+            if not any(unit in sla for unit in ['minuto', 'hora', 'dia', 'semana', 'mes', 'mês']):
+                return False, "Inclua uma unidade de tempo válida (ex: minutos, horas)"
+        return True, ""
+        
+    elif field == 'dependencies':
+        if step['id'] in value:
+            return False, "Uma etapa não pode depender dela mesma"
             
-            # Cabeçalho com número da etapa e botões
-            col1, col2, col3 = st.columns([8, 1, 1])
+        valid_ids = {s['id'] for s in st.session_state.process_steps}
+        invalid_deps = [dep for dep in value if dep not in valid_ids]
+        if invalid_deps:
+            return False, f"Dependências inválidas: {', '.join(invalid_deps)}"
+        return True, ""
+    
+    return True, ""
+
+def render_step_card(step: dict, on_edit: callable, on_delete: callable):
+    """Renderiza um card para uma etapa do processo."""
+    st.markdown("""
+    <style>
+    .step-card {
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 15px 0;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    .step-card:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    .step-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+    }
+    .step-type-badge {
+        font-size: 0.85em;
+        padding: 4px 10px;
+        border-radius: 15px;
+        margin-left: 10px;
+        background: #f0f2f6;
+        color: #444;
+    }
+    .step-content {
+        padding: 10px 0;
+    }
+    .step-description {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 10px;
+        margin: 10px 0;
+    }
+    .image-preview {
+        max-height: 200px;
+        object-fit: contain;
+        margin: 10px auto;
+        display: block;
+    }
+    .image-container {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 10px;
+        text-align: center;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    with st.container():
+        st.markdown(f'<div class="step-card">', unsafe_allow_html=True)
+        
+        # Cabeçalho com Nome e Tipo
+        cols = st.columns([8, 3, 1])
+        
+        with cols[0]:
+            name = st.text_input(
+                "Nome da Etapa *",
+                value=step['name'],
+                key=f"step_name_{step['id']}",
+                help="Nome descritivo da etapa (máx. 100 caracteres)",
+                placeholder="Ex: Verificar documentação"
+            )
+        
+        with cols[1]:
+            type_mapping = {
+                'Ação': ('action', '⚡', '#FF9D00'),
+                'Decisão': ('decision', '🔄', '#00B8D4'),
+                'Sistema': ('system', '💻', '#7C4DFF'),
+                'Início': ('start', '🟢', '#00C853'),
+                'Fim': ('end', '🔴', '#FF1744')
+            }
+            
+            current_type_pt = next(
+                (pt for pt, (en, _, _) in type_mapping.items() if en == step['type']),
+                'Ação'
+            )
+            
+            new_type_pt = st.selectbox(
+                "Tipo *",
+                list(type_mapping.keys()),
+                index=list(type_mapping.keys()).index(current_type_pt),
+                key=f"step_type_{step['id']}",
+                format_func=lambda x: f"{type_mapping[x][1]} {x}",
+                help="Tipo de operação realizada nesta etapa"
+            )
+        
+        with cols[2]:
+            if st.button("🗑️", key=f"delete_{step['id']}", help="Remover esta etapa"):
+                on_delete(step['id'])
+        
+        # Validação e atualização dos dados
+        is_valid_name, name_error = validate_step_field(step, 'name', name)
+        new_type = type_mapping[new_type_pt][0]
+        is_valid_type, type_error = validate_step_field(step, 'type', new_type)
+        
+        if not is_valid_name:
+            st.error(name_error)
+        elif not is_valid_type:
+            st.error(type_error)
+        else:
+            step['name'] = name
+            step['type'] = new_type
+            step['updated_at'] = datetime.now().isoformat()
+        
+        # Descrição e Imagem lado a lado
+        with st.expander("📝 Detalhes da Etapa", expanded=False):
+            col1, col2 = st.columns([2, 1])
+            
             with col1:
-                st.subheader(f"Etapa {i+1}")
+                description = st.text_area(
+                    "Descrição Detalhada",
+                    value=step.get('description', ''),
+                    key=f"step_desc_{step['id']}",
+                    placeholder="Ex: Nesta etapa, o sistema deve verificar...",
+                    help="Máximo de 500 caracteres",
+                    max_chars=500,
+                    height=150
+                )
+                
+                if description != step.get('description', ''):
+                    step['description'] = description
+                    step['updated_at'] = datetime.now().isoformat()
+            
             with col2:
-                if st.button("⬆️", key=f"up_{i}", help="Mover para cima"):
-                    if i > 0:
-                        st.session_state.process_steps[i], st.session_state.process_steps[i-1] = \
-                            st.session_state.process_steps[i-1], st.session_state.process_steps[i]
-                        st.rerun()
-            with col3:
-                if st.button("🗑️", key=f"del_{i}", help="Remover etapa"):
-                    on_delete(i)
+                st.markdown('<div class="image-container">', unsafe_allow_html=True)
+                
+                uploaded_file = st.file_uploader(
+                    "Imagem da Etapa",
+                    type=['png', 'jpg', 'jpeg'],
+                    key=f"step_img_{step['id']}",
+                    help="Faça upload de uma imagem ilustrativa"
+                )
+                
+                # Preview da imagem
+                if uploaded_file:
+                    st.image(
+                        uploaded_file, 
+                        caption="Preview",
+                        use_container_width=True,
+                        output_format="PNG"
+                    )
+                    step['image'] = uploaded_file.getvalue()
+                    step['updated_at'] = datetime.now().isoformat()
+                elif step.get('image'):
+                    st.image(
+                        step['image'], 
+                        caption="Imagem atual",
+                        use_container_width=True,
+                        output_format="PNG"
+                    )
+                else:
+                    st.info("Nenhuma imagem adicionada")
+                
+                st.markdown('</div>', unsafe_allow_html=True)
             
-            # Nome da etapa
-            step['name'] = st.text_input(
-                "Nome da Etapa",
-                value=step.get('name', ''),
-                key=f"step_name_{i}",
-                placeholder="Ex: Acessar sistema"
-            )
-            
-            # Descrição detalhada (opcional)
-            step['description'] = st.text_area(
-                "Descrição Detalhada (opcional)",
-                value=step.get('description', ''),
-                key=f"step_desc_{i}",
-                placeholder="Descreva os detalhes desta etapa...",
-                help="Forneça informações adicionais sobre esta etapa"
-            )
-            
-            # Upload de imagem (opcional)
-            uploaded_file = st.file_uploader(
-                "Imagem da Etapa (opcional)",
-                type=['png', 'jpg', 'jpeg'],
-                key=f"step_img_{i}",
-                help="Faça upload de uma imagem ilustrativa"
-            )
-            
-            if uploaded_file:
-                step['image'] = uploaded_file.getvalue()
-                st.image(step['image'], caption=f"Imagem da Etapa {i+1}", use_column_width=True)
-            elif 'image' in step and step['image']:
-                st.image(step['image'], caption=f"Imagem da Etapa {i+1}", use_column_width=True)
-            
+            # Contador de caracteres
+            if description:
+                st.caption(f"{len(description)}/500 caracteres")
+        
+        # Rodapé com informações adicionais
+        if step.get('dependencies'):
+            st.markdown('<div class="step-footer">', unsafe_allow_html=True)
+            deps = [
+                next((s['name'] for s in st.session_state.process_steps if s['id'] == dep_id), dep_id)
+                for dep_id in step['dependencies']
+            ]
+            st.markdown(f"📎 **Depende de:** {', '.join(deps)}")
             st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
 def render_tool_card(i: int, tool: dict, on_delete: Callable):
     """Renderiza um card para uma ferramenta/sistema customizado."""
@@ -385,312 +634,158 @@ def render_tool_card(i: int, tool: dict, on_delete: Callable):
         
         st.markdown('</div>', unsafe_allow_html=True)
 
-def render_step_edit_modal(step: dict, step_number: int):
-    """Renderiza o modal de edição de etapa."""
-    modal = Modal(
-        "Editar Etapa",
-        key=f"modal_edit_step_{step_number}"
-    )
-
-    if modal.is_open():
-        with modal.container():
-            with st.form(f"edit_step_form_{step_number}"):
-                st.write(f"### Editar Etapa {step_number + 1}")
-                
-                # Nome da etapa
-                new_name = st.text_input(
-                    "Nome da Etapa",
-                    value=step.get('name', ''),
-                    placeholder="Ex: Acessar sistema"
-                )
-                
-                # Descrição detalhada
-                new_description = st.text_area(
-                    "Descrição Detalhada",
-                    value=step.get('description', ''),
-                    placeholder="Descreva os detalhes desta etapa..."
-                )
-                
-                # Upload de imagem
-                uploaded_file = st.file_uploader(
-                    "Imagem da Etapa",
-                    type=['png', 'jpg', 'jpeg']
-                )
-                
-                if uploaded_file:
-                    new_image = uploaded_file.getvalue()
-                    st.image(new_image, caption="Preview da Imagem")
-                elif step.get('image'):
-                    st.image(step['image'], caption="Imagem Atual")
-                    new_image = step['image']
-                else:
-                    new_image = None
-                
-                # Botões de ação
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.form_submit_button("💾 Salvar"):
-                        step.update({
-                            'name': new_name,
-                            'description': new_description,
-                            'image': new_image
-                        })
-                        modal.close()
-                        st.rerun()
-                
-                with col2:
-                    if st.form_submit_button("❌ Cancelar"):
-                        modal.close()
-                        st.rerun()
-
 def render_process_details(on_submit: Optional[Callable] = None, initial_data: dict = None):
     """Renderiza o formulário de detalhes do processo."""
-    # Usa dados salvos ou iniciais
-    saved_data = st.session_state.form_data.get('details', {})
-    initial_data = saved_data or initial_data or {}
-    
-    # Verifica se já temos uma descrição do processo
-    process_description = st.session_state.form_data.get('identification', {}).get('process_description', '')
-    
-    # Se temos uma descrição e não temos dados inferidos, vamos inferir
-    if process_description and not saved_data:
-        try:
-            ai_service = AIService()
-            analysis = ai_service.analyze_process_description(process_description)
-            
-            # Filtra as sugestões para incluir apenas opções válidas
-            initial_data = {
-                'steps': analysis['details'].get('steps', []),
-                'tools': {
-                    'common_tools': filter_valid_options(
-                        analysis['details'].get('tools', []),
-                        OPTIONS['systems']['common_tools']
-                    ),
-                    'custom_tools': []
-                },
-                'data_types': filter_valid_options(
-                    analysis['details'].get('data_types', []),
-                    OPTIONS['data_types']
-                ),
-                'data_formats': filter_valid_options(
-                    analysis['details'].get('data_formats', []),
-                    OPTIONS['data_formats']
-                ),
-                'data_sources': filter_valid_options(
-                    analysis['details'].get('data_sources', []),
-                    OPTIONS['data_sources']
-                ),
-                'data_volume': analysis['details'].get('data_volume', 'Médio')
-            }
-        except Exception as e:
-            st.warning(f"Não foi possível inferir dados automaticamente: {str(e)}")
-    
-    # Inicializa estruturas de dados mais ricas
+    # Inicialização do estado
     if 'process_steps' not in st.session_state:
-        steps = initial_data.get('steps', [])
-        st.session_state.process_steps = [{'name': step} for step in steps] if steps else [{'name': ''}]
+        st.session_state.process_steps = []
     
-    # Inicializa sistemas customizados
-    if 'custom_tools' not in st.session_state:
-        tools_data = initial_data.get('tools', {})
-        custom_tools = []
-        
-        # Adiciona ferramentas inferidas pela IA
-        if 'ai_suggestions' in st.session_state:
-            ai_tools = st.session_state.ai_suggestions.get('details', {}).get('tools', [])
-            if ai_tools:
-                for tool in ai_tools:
-                    # Extrai o nome base do sistema e sua descrição
-                    if "(" in tool and ")" in tool:
-                        tool_name = tool[:tool.find("(")].strip()
-                        tool_desc = tool[tool.find("(")+1:tool.find(")")].strip()
-                    else:
-                        tool_name = tool.strip()
-                        tool_desc = ""
-                    
-                    # Se não for um sistema comum, adiciona aos customizados
-                    if tool_name not in OPTIONS['systems']['common_tools']:
-                        custom_tools.append({
-                            'name': tool_name,
-                            'description': tool_desc
-                        })
-                    # Se for um sistema comum, adiciona à lista de seleção padrão
-                    else:
-                        if 'common_tools' not in initial_data.get('tools', {}):
-                            initial_data.setdefault('tools', {})['common_tools'] = []
-                        if tool_name not in initial_data['tools']['common_tools']:
-                            initial_data['tools']['common_tools'].append(tool_name)
-        
-        # Adiciona ferramentas customizadas dos dados iniciais
-        if isinstance(tools_data, dict):
-            for tool in tools_data.get('custom_tools', []):
-                if not any(t['name'] == tool for t in custom_tools):
-                    custom_tools.append({'name': tool})
-        
-        # Se não houver nenhuma ferramenta, adiciona uma vazia
-        st.session_state.custom_tools = custom_tools if custom_tools else [{'name': '', 'description': ''}]
-    
-    # Controles de estado
     if 'editing_step' not in st.session_state:
         st.session_state.editing_step = None
     
-    # Gerenciamento de etapas (fora do form)
-    st.write("### 📝 Etapas do Processo")
+    if 'custom_tools' not in st.session_state:
+        st.session_state.custom_tools = []
     
-    # Prepara os itens para ordenação
-    step_labels = [
-        f"{i+1}. {step.get('name', 'Nova Etapa')}"
-        for i, step in enumerate(st.session_state.process_steps)
-    ]
-    
-    # Renderiza a lista ordenável
-    sorted_indices = sort_items(step_labels)
-    
-    # Se a ordem mudou, reordena as etapas
-    if sorted_indices != step_labels:
-        # Extrai os índices originais dos labels ordenados
-        original_indices = [
-            int(label.split('.')[0]) - 1
-            for label in sorted_indices
-        ]
+    # Se temos sugestões da IA e o formulário ainda não foi processado
+    if 'ai_suggestions' in st.session_state and not st.session_state.get('suggestions_processed'):
+        suggestions = st.session_state.ai_suggestions
         
-        # Reordena as etapas
+        # Converte as sugestões em etapas do processo
         st.session_state.process_steps = [
-            st.session_state.process_steps[i]
-            for i in original_indices
+            {
+                'id': f"step_{i}",
+                'name': step,
+                'description': '',
+                'type': infer_step_type(step),
+                'responsible': '',
+                'sla': '',
+                'dependencies': [],
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            }
+            for i, step in enumerate(suggestions.get('steps_as_is', []))
         ]
+        
+        # Atualiza os sistemas identificados
+        st.session_state.custom_tools = suggestions.get('details', {}).get('tools', [])
+        
+        # Filtra os valores sugeridos para garantir que sejam válidos
+        suggested_data_types = suggestions.get('details', {}).get('data_types', [])
+        valid_data_types = [dt for dt in suggested_data_types if dt in OPTIONS['data_types']]
+        
+        suggested_data_formats = suggestions.get('details', {}).get('data_formats', [])
+        valid_data_formats = [df for df in suggested_data_formats if df in OPTIONS['data_formats']]
+        
+        suggested_data_sources = suggestions.get('details', {}).get('data_sources', [])
+        valid_data_sources = [ds for ds in suggested_data_sources if ds in OPTIONS['data_sources']]
+        
+        # Atualiza os dados do processo com valores válidos
+        if 'form_data' not in st.session_state:
+            st.session_state.form_data = {}
+            
+        st.session_state.form_data['details'] = {
+            'steps': suggestions.get('details', {}).get('steps', []),
+            'tools': {
+                'common_tools': [],
+                'custom_tools': st.session_state.custom_tools
+            },
+            'data_types': valid_data_types,
+            'data_formats': valid_data_formats,
+            'data_sources': valid_data_sources,
+            'data_volume': suggestions.get('details', {}).get('data_volume', 'Médio')
+        }
+        
+        # Marca que as sugestões foram processadas
+        st.session_state.suggestions_processed = True
+        
+        # Força atualização da interface
         st.rerun()
     
-    # Renderiza os detalhes de cada etapa
-    for i, step in enumerate(st.session_state.process_steps):
-        with st.container():
-            cols = st.columns([8, 1, 1])
-            
-            with cols[0]:
-                st.write(step.get('name', 'Nova Etapa'))
-                if step.get('description'):
-                    st.caption(
-                        step.get('description', '')[:100] + '...' 
-                        if len(step.get('description', '')) > 100 
-                        else step.get('description', '')
-                    )
-                if step.get('image'):
-                    st.image(step.get('image'), width=100)
-            
-            with cols[1]:
-                if st.button("✏️", key=f"edit_{i}"):
-                    render_step_edit_modal(step, i)
-            
-            with cols[2]:
-                if st.button("🗑️", key=f"delete_{i}"):
-                    st.session_state.process_steps.pop(i)
-                    st.rerun()
+    # Interface do usuário
+    st.write("### 📝 Detalhes do Processo")
     
-    # Botão para adicionar nova etapa
-    if st.button("➕ Nova Etapa", key="add_new"):
-        st.session_state.process_steps.append({'name': '', 'description': '', 'image': None})
-        st.rerun()
+    # Tabs principais para organizar o conteúdo
+    tab_steps, tab_systems, tab_data = st.tabs(["📋 Etapas", "🔧 Sistemas", "📊 Dados"])
     
-    # Modal de edição
-    if st.session_state.editing_step is not None:
-        with st.form(f"edit_form_{st.session_state.editing_step}"):
-            step = st.session_state.process_steps[st.session_state.editing_step]
-            
-            st.write(f"### Editar Etapa {st.session_state.editing_step + 1}")
-            
-            step['name'] = st.text_input(
-                "Nome da Etapa",
-                value=step.get('name', ''),
-                placeholder="Ex: Acessar sistema"
-            )
-            
-            step['description'] = st.text_area(
-                "Descrição Detalhada",
-                value=step.get('description', ''),
-                placeholder="Descreva os detalhes desta etapa..."
-            )
-            
-            uploaded_file = st.file_uploader(
-                "Imagem da Etapa",
-                type=['png', 'jpg', 'jpeg']
-            )
-            
-            if uploaded_file:
-                step['image'] = uploaded_file.getvalue()
-                st.image(step['image'], caption="Preview da Imagem")
-            elif step.get('image'):
-                st.image(step['image'], caption="Imagem Atual")
-            
-            if st.form_submit_button("Salvar"):
-                st.session_state.editing_step = None
-                st.rerun()
-    
-    # Formulário principal
-    with st.form("details_form"):
-        # Sistemas e Ferramentas
-        st.write("### 🔧 Sistemas e Ferramentas")
-        
-        # Sistemas Comuns (Predefinidos)
-        st.write("**Sistemas Comuns**")
-        common_tools = st.multiselect(
-            "Selecione os sistemas predefinidos:",
-            OPTIONS['systems']['common_tools'],
-            default=initial_data.get('tools', {}).get('common_tools', []),
-            help="Selecione os sistemas comumente utilizados na empresa"
-        )
-        
-        st.divider()
-        
-        # Sistemas Customizados
-        st.write("**Sistemas Customizados**")
-        
-        # Lista de sistemas customizados
-        custom_tools = []
-        for i, tool in enumerate(st.session_state.custom_tools):
-            cols = st.columns([8, 4])
-            with cols[0]:
-                tool_name = st.text_input(
-                    f"Sistema {i+1}",
-                    value=tool.get('name', ''),
-                    key=f"custom_tool_{i}",
-                    placeholder="Nome do sistema customizado"
+    with tab_steps:
+        # Lista de etapas existentes
+        for step in st.session_state.process_steps:
+            render_step_card(
+                step,
+                on_edit=lambda id: None,
+                on_delete=lambda id: st.session_state.process_steps.remove(
+                    next(s for s in st.session_state.process_steps if s['id'] == id)
                 )
-            with cols[1]:
-                tool_desc = st.text_input(
-                    "Descrição",
-                    value=tool.get('description', ''),
-                    key=f"custom_tool_desc_{i}",
-                    placeholder="Finalidade do sistema"
-                )
-            if tool_name:
-                custom_tools.append({
-                    'name': tool_name,
-                    'description': tool_desc
-                })
+            )
         
-        # Botão para adicionar novo sistema
-        if st.form_submit_button("➕ Adicionar Sistema"):
-            st.session_state.custom_tools.append({'name': ''})
+        # Botão para adicionar nova etapa
+        if st.button("➕ Nova Etapa", use_container_width=True):
+            new_id = f"step_{len(st.session_state.process_steps)}"
+            st.session_state.process_steps.append({
+                'id': new_id,
+                'name': '',
+                'description': '',
+                'type': 'action',
+                'responsible': '',
+                'sla': '',
+                'dependencies': [],
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            })
             st.rerun()
-        
-        st.divider()
-        
-        # Seção 3: Dados do Processo
-        st.write("### 📊 Dados do Processo")
-        
+    
+    with tab_systems:
         col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Sistemas Comuns**")
+            common_tools = st.multiselect(
+                "Selecione os sistemas utilizados:",
+                OPTIONS['common_tools'],
+                default=st.session_state.get('common_tools', []),
+                help="Sistemas e ferramentas comumente usados"
+            )
+        
+        with col2:
+            st.write("**Sistemas Customizados**")
+            # Interface para adicionar sistemas customizados
+            new_tool = st.text_input(
+                "Adicionar novo sistema:",
+                key="new_tool_input",
+                placeholder="Ex: SAP, Portal Interno, etc."
+            )
+            if st.button("➕ Adicionar Sistema"):
+                if new_tool and new_tool not in st.session_state.custom_tools:
+                    st.session_state.custom_tools.append(new_tool)
+                    st.rerun()
+            
+            # Lista de sistemas customizados
+            for idx, tool in enumerate(st.session_state.custom_tools):
+                col_a, col_b = st.columns([4, 1])
+                with col_a:
+                    st.info(f"• {tool}")
+                with col_b:
+                    if st.button("🗑️", key=f"del_tool_{idx}"):
+                        st.session_state.custom_tools.pop(idx)
+                        st.rerun()
+    
+    with tab_data:
+        col1, col2 = st.columns(2)
+        
         with col1:
             st.write("**Tipos e Formatos**")
             data_types = st.multiselect(
                 "Tipos de Dados:",
                 OPTIONS['data_types'],
-                default=initial_data.get('data_types', [])
+                default=initial_data.get('data_types', []),
+                help="Tipos de dados manipulados no processo"
             )
             
             data_formats = st.multiselect(
                 "Formatos de Dados:",
                 OPTIONS['data_formats'],
-                default=initial_data.get('data_formats', [])
+                default=initial_data.get('data_formats', []),
+                help="Formatos de arquivos e dados utilizados"
             )
         
         with col2:
@@ -698,37 +793,38 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
             data_sources = st.multiselect(
                 "Fontes de Dados:",
                 OPTIONS['data_sources'],
-                default=initial_data.get('data_sources', [])
+                default=initial_data.get('data_sources', []),
+                help="De onde os dados são obtidos"
             )
             
             data_volume = st.select_slider(
                 "Volume de Dados:",
-                options=['Baixo', 'Médio', 'Alto'],
-                value=initial_data.get('data_volume', 'Médio')
+                options=["Baixo", "Médio", "Alto"],
+                value=initial_data.get('data_volume', "Médio"),
+                help="Volume diário de dados processados"
             )
+    
+    # Botão de salvar (fixo na parte inferior)
+    st.divider()
+    if st.button("💾 Salvar Alterações", type="primary", use_container_width=True):
+        data = {
+            "steps": [step['name'] for step in st.session_state.process_steps],
+            "tools": {
+                "common_tools": common_tools,
+                "custom_tools": st.session_state.custom_tools
+            },
+            "data_types": data_types,
+            "data_formats": data_formats,
+            "data_sources": data_sources,
+            "data_volume": data_volume
+        }
         
-        # Botão de Salvar
-        if st.form_submit_button("💾 Salvar Detalhes do Processo"):
-            # Remove sistemas vazios
-            st.session_state.custom_tools = [
-                tool for tool in st.session_state.custom_tools 
-                if tool.get('name', '').strip()
-            ]
-            
-            data = {
-                "steps": st.session_state.process_steps,
-                "tools": {
-                    "common_tools": common_tools,
-                    "custom_tools": [tool['name'] for tool in custom_tools if tool['name'].strip()]
-                },
-                "data_types": data_types,
-                "data_formats": data_formats,
-                "data_sources": data_sources,
-                "data_volume": data_volume
-            }
-            
-            if validate_and_submit(data, ["steps"], on_submit):
-                st.success("✅ Detalhes do processo salvos com sucesso!")
+        if validate_and_submit(data, ["steps"], on_submit):
+            st.success("Detalhes do processo salvos com sucesso!")
+    
+    # Debug no final, colapsado por padrão
+    with st.expander("🔍 Debug", expanded=False):
+        render_debug_section()
 
 def render_business_rules(on_submit: Optional[Callable] = None, initial_data: dict = None):
     """Renderiza o formulário de regras de negócio e exceções."""
@@ -995,3 +1091,149 @@ def render_automation_goals(on_submit: Optional[Callable] = None, initial_data: 
             
             if validate_and_submit(data, ["automation_goals", "kpis"], on_submit):
                 st.success("Objetivos e KPIs salvos com sucesso!")
+
+def validate_step(step: dict) -> tuple[bool, list[str]]:
+    """Valida os dados de uma etapa do processo."""
+    errors = []
+    
+    # Validação do nome
+    if not step.get('name', '').strip():
+        errors.append("Nome da etapa é obrigatório")
+    elif len(step['name']) > 100:
+        errors.append("Nome da etapa deve ter no máximo 100 caracteres")
+    
+    # Validação do tipo
+    valid_types = ["action", "decision", "system", "start", "end"]
+    if step.get('type') not in valid_types:
+        errors.append("Tipo de etapa inválido")
+    
+    # Validação da descrição
+    if step.get('description') and len(step['description']) > 500:
+        errors.append("Descrição deve ter no máximo 500 caracteres")
+    
+    # Validação do SLA
+    if step.get('sla'):
+        sla = step['sla'].lower()
+        if not any(unit in sla for unit in ['minuto', 'hora', 'dia', 'semana', 'mes', 'mês']):
+            errors.append("SLA deve incluir uma unidade de tempo válida")
+    
+    # Validação de dependências
+    if step.get('dependencies'):
+        # Verifica se não há dependência circular
+        if step['id'] in step['dependencies']:
+            errors.append("Uma etapa não pode depender dela mesma")
+        
+        # Verifica se todas as dependências existem
+        valid_ids = {s['id'] for s in st.session_state.process_steps}
+        invalid_deps = [dep for dep in step['dependencies'] if dep not in valid_ids]
+        if invalid_deps:
+            errors.append(f"Dependências inválidas: {', '.join(invalid_deps)}")
+    
+    return len(errors) == 0, errors
+
+def render_debug_section():
+    """Renderiza uma seção de debug com os dados do processo."""
+    st.write("### 🔍 Debug Detalhado")
+    
+    # Usa tabs para organizar os dados
+    tabs = st.tabs([
+        "📋 Etapas", 
+        "🔧 Sistemas", 
+        "📊 Estado", 
+        "📝 Dados Iniciais", 
+        "🤖 Sugestões IA",
+        "📄 Form Data"
+    ])
+    
+    with tabs[0]:
+        st.write("#### Etapas do Processo")
+        st.write(f"Total de etapas: {len(st.session_state.process_steps)}")
+        
+        # Usa uma tabela para mostrar as etapas
+        steps_data = []
+        for i, step in enumerate(st.session_state.process_steps, 1):
+            steps_data.append({
+                "Nº": i,
+                "ID": step['id'],
+                "Nome": step['name'],
+                "Tipo": step['type'],
+                "Descrição": step.get('description', ''),
+                "Dependências": ', '.join(step.get('dependencies', [])),
+                "Criado em": step['created_at'],
+                "Atualizado em": step['updated_at']
+            })
+        
+        # Mostra os dados em formato de tabela
+        if steps_data:
+            st.dataframe(
+                steps_data,
+                use_container_width=True,
+                column_config={
+                    "Nº": st.column_config.NumberColumn(width=50),
+                    "ID": st.column_config.TextColumn(width=100),
+                    "Nome": st.column_config.TextColumn(width=200),
+                    "Tipo": st.column_config.TextColumn(width=100),
+                    "Descrição": st.column_config.TextColumn(width=200),
+                    "Dependências": st.column_config.TextColumn(width=150),
+                    "Criado em": st.column_config.DatetimeColumn(width=150),
+                    "Atualizado em": st.column_config.DatetimeColumn(width=150)
+                }
+            )
+        
+        # Dados brutos em JSON
+        st.write("**Dados Brutos:**")
+        st.json(st.session_state.process_steps)
+    
+    with tabs[1]:
+        st.write("#### Sistemas")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Sistemas Comuns:**")
+            st.json(st.session_state.get('common_tools', []))
+        
+        with col2:
+            st.write("**Sistemas Customizados:**")
+            st.json(st.session_state.custom_tools)
+    
+    with tabs[2]:
+        st.write("#### Estado da Sessão")
+        state_data = {
+            'editing_step': st.session_state.editing_step,
+            'debug_mode': st.session_state.get('debug_mode', False),
+            'current_step': st.session_state.get('current_step'),
+            'form_submitted': st.session_state.get('form_submitted', False)
+        }
+        st.json(state_data)
+    
+    with tabs[3]:
+        st.write("#### Dados Iniciais")
+        st.json(st.session_state.get('initial_data', {}))
+    
+    with tabs[4]:
+        st.write("#### Sugestões da IA")
+        if 'ai_suggestions' in st.session_state:
+            for key, value in st.session_state.ai_suggestions.items():
+                st.write(f"**{key}:**")
+                st.json(value)
+        else:
+            st.info("Nenhuma sugestão da IA disponível")
+    
+    with tabs[5]:
+        st.write("#### Dados do Formulário")
+        st.json(st.session_state.form_data)
+
+def infer_step_type(step_name: str) -> str:
+    """Infere o tipo da etapa baseado em seu nome/descrição."""
+    step_lower = step_name.lower()
+    
+    # Padrões para identificar tipos de etapas
+    if any(word in step_lower for word in ['verificar', 'validar', 'conferir', 'checar']):
+        return 'decision'
+    elif any(word in step_lower for word in ['sistema', 'acessar', 'login', 'portal', 'sap', 'excel']):
+        return 'system'
+    elif 'inicio' in step_lower or 'receb' in step_lower or step_lower.startswith('iniciar'):
+        return 'start'
+    elif 'fim' in step_lower or 'finalizar' in step_lower or 'concluir' in step_lower:
+        return 'end'
+    else:
+        return 'action'

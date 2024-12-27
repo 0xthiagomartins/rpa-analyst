@@ -1,114 +1,67 @@
-# TODO List
+# TODO List 📝
 
-## ✅ Fase A - Estrutura Básica
-- [x] Configuração inicial do projeto
-- [x] Estrutura de diretórios
-- [x] Configuração de ambiente
-- [x] Integração com Streamlit
+## Melhorias na Estrutura do JSON de Análise
 
-## ✅ Fase B - Formulários Base
-- [x] Formulário de identificação
-- [x] Formulário de detalhes do processo
-- [x] Formulário de regras de negócio
-- [x] Formulário de objetivos e KPIs
+### 1. ✅ Organização de Passos
+- [x] Implementar agrupamento de passos em fases
+- [x] Adicionar metadados para cada fase
+- [x] Criar visualização hierárquica no frontend
 
-## 🔄 Fase C - Melhorias de UX
-- [x] Navegação entre etapas
-- [x] Validação de campos
-- [x] Mensagens de feedback
-- [x] Templates predefinidos
-- [ ] Upload de screenshots para steps específicos
-  - [ ] Permitir upload de imagens por step
-  - [ ] Preview da imagem ao lado do step
-  - [ ] Organização das imagens no documento final
-  - [ ] Validação de formato e tamanho das imagens
-  - [ ] Compressão automática de imagens grandes
+### 2. ✅ Estruturação com IDs
+- [x] Implementar IDs únicos para passos
+- [x] Criar referências cruzadas
+- [x] Desenvolver sistema de rastreamento
 
-## 🎯 Fase D - Documentação
-- [x] Geração do PDD básico
-- [ ] Fluxograma do processo
-  - [ ] Integração com Mermaid.js
-  - [ ] Geração automática baseada nos steps
-  - [ ] Preview do fluxograma na interface
-  - [ ] Exportação do fluxograma em SVG/PNG
-  - [ ] Integração com IA para geração de fluxograma
-    - [ ] Análise de texto dos steps via IA
-    - [ ] Identificação automática de decisões e loops
-    - [ ] Sugestão de conectores e relacionamentos
-    - [ ] Otimização do layout do diagrama
-  - [ ] Editor visual de fluxograma
-    - [ ] Interface drag-and-drop para edição
-    - [ ] Paleta de componentes padrão BPMN
-    - [ ] Validação de conexões e regras
-    - [ ] Histórico de alterações (undo/redo)
-  - [ ] Sincronização bidirecional
-    - [ ] Atualização do texto ao editar diagrama
-    - [ ] Atualização do diagrama ao editar texto
-    - [ ] Resolução de conflitos
-  - [ ] Exportação e compartilhamento
-    - [ ] Múltiplos formatos (PNG, SVG, PDF)
-    - [ ] Integração com ferramentas de modelagem
-    - [ ] Links compartilháveis
-- [ ] Quadrante de precificação
-  - [ ] Cálculo automático baseado em complexidade
-  - [ ] Fatores de precificação:
-    - [ ] Número de steps
-    - [ ] Sistemas envolvidos
-    - [ ] Complexidade das regras
-    - [ ] Volume de dados
-  - [ ] Proposta comercial automática
-  - [ ] Opções de pagamento integradas
+### 3. ✅ Fluxo de Dependências
+- [x] Visualização de dependências
+- [x] Validação de dependências circulares
+- [x] Interface de seleção de dependências
 
-## 🎨 Fase E - Interface
-- [ ] Temas personalizados
-- [ ] Responsividade
-- [ ] Animações de transição
-- [ ] Preview em tempo real
+### 4. 🔄 Feedback Visual (Em Progresso)
+- [ ] Adicionar animações de transição
+- [ ] Melhorar indicadores de estado
+- [ ] Implementar tooltips informativos
+- [ ] Adicionar ícones contextuais
+- [ ] Melhorar layout responsivo
 
-## 🔒 Fase F - Segurança e Deploy
-- [ ] Validação de entrada de dados
-- [ ] Sanitização de HTML
-- [ ] Documentação de deployment
-- [ ] Guia de instalação
+### 5. Pré-requisitos e Condições
+- [ ] Adicionar seção de pré-requisitos
+- [ ] Incluir validações de ambiente
+- [ ] Documentar dependências técnicas
 
-## 🚀 Fase G - Features Avançadas
-- [ ] Versionamento de documentos
-- [ ] Exportação em múltiplos formatos
-- [ ] Integração com sistemas de pagamento
-- [ ] API para integração externa
-- [ ] Sistema de templates personalizados
+### 6. Segurança e Compliance
+- [ ] Adicionar seção de requisitos de segurança
+- [ ] Documentar aspectos de compliance
+- [ ] Incluir checklist de validação
 
-## 📊 Fase H - Analytics
-- [ ] Dashboard de processos
-- [ ] Métricas de uso
-- [ ] Relatórios de performance
-- [ ] Análise de ROI automática
+### 7. Autenticação e Permissões
+- [ ] Detalhar requisitos de acesso
+- [ ] Documentar níveis de permissão
+- [ ] Incluir logs de auditoria
 
-## 🤖 Fase I - IA e Automação
-- [ ] Sugestões automáticas de steps
-- [ ] Detecção de padrões em processos
-- [ ] Recomendações de melhorias
-- [ ] Análise de complexidade automática
-- [ ] Geração e edição de fluxogramas
-  - [ ] Modelo de linguagem para análise de texto
-  - [ ] Identificação de entidades e relacionamentos
-  - [ ] Sugestão de melhorias no fluxo
-  - [ ] Detecção de gargalos e redundâncias
-  - [ ] Otimização automática do layout
-  - [ ] Validação semântica do fluxo
-  - [ ] Geração de documentação baseada no fluxo
-  - [ ] Versionamento inteligente de diagramas
-  - [ ] Análise comparativa de versões
-  - [ ] Sugestões de refatoração do processo
+### 8. Formatos de Saída
+- [ ] Documentar todos os outputs esperados
+- [ ] Especificar formatos de arquivo
+- [ ] Incluir exemplos de saída
 
-## 💼 Fase J - Módulo Comercial
-- [ ] Geração de propostas comerciais
-- [ ] Integração com CRM
-- [ ] Pipeline de vendas
-- [ ] Acompanhamento de aprovações
+### 9. KPIs Detalhados
+- [ ] Adicionar métricas específicas
+- [ ] Documentar fórmulas de cálculo
+- [ ] Implementar dashboard de monitoramento
 
-## 📱 Fase K - Integrações
-- [ ] Integração com ferramentas RPA
-- [ ] Webhooks personalizados
-- [ ] Notificações por email/Slack
-- [ ] Calendário de implementação
+### 10. Responsabilidades
+- [ ] Adicionar campo de responsável por etapa
+- [ ] Documentar matriz de responsabilidades
+- [ ] Implementar notificações por papel
+
+## Próximos Passos Imediatos
+1. Finalizar melhorias visuais
+2. Implementar validações em tempo real
+3. Adicionar histórico de alterações
+4. Melhorar documentação
+
+## Notas de Implementação
+- Manter compatibilidade com dados existentes
+- Implementar mudanças gradualmente
+- Priorizar melhorias com maior impacto
+- Documentar todas as alterações

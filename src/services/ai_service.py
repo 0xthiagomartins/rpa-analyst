@@ -30,19 +30,19 @@ class AIService:
             raise ValueError("Descrição do processo e passos são obrigatórios")
         if not steps or not isinstance(steps, list) or not all(steps):
             raise ValueError("Descrição do processo e passos são obrigatórios")
-
-        # Template do prompt
+            
+            # Template do prompt
         template = """
         Você é um especialista em criar diagramas de fluxo usando Mermaid.
         Crie um diagrama de fluxo que represente o processo descrito abaixo.
         Use a sintaxe flowchart TD do Mermaid.
-        
-        Descrição do Processo:
-        {description}
-        
-        Passos do Processo:
-        {steps}
-        
+            
+            Descrição do Processo:
+            {description}
+            
+            Passos do Processo:
+            {steps}
+            
         Regras para o diagrama:
         1. Use flowchart TD (top-down)
         2. Identifique cada nó com IDs únicos (p1, p2, etc)
@@ -66,7 +66,7 @@ class AIService:
         
         # Prepara o prompt
         prompt = ChatPromptTemplate.from_template(template)
-        
+    
         # Prepara os dados
         formatted_steps = "\n".join(f"- {step}" for step in steps)
         
@@ -163,8 +163,8 @@ class AIService:
         # Cria e executa a chain
         chain = LLMChain(llm=self.llm, prompt=prompt)
         result = chain.invoke({
-            "description": process_description,
-            "steps": formatted_steps,
+                    "description": process_description,
+                    "steps": formatted_steps,
             "current_diagram": current_diagram,
             "history": history_text,
             "feedback": feedback
@@ -463,72 +463,64 @@ class AIService:
 
     def infer_process_data(self, description: str, steps: List[str]) -> dict:
         """Infere dados do processo a partir da descrição e passos."""
-        template = """
-        Você é um especialista em análise de processos RPA.
-        Analise cuidadosamente a descrição e os passos do processo abaixo e extraia informações sobre os dados manipulados.
+        template = """Você é um especialista em análise de processos RPA.
+Analise a descrição e os passos do processo abaixo e extraia informações sobre os dados manipulados.
 
-        Descrição do Processo:
-        {description}
+Descrição do Processo:
+{description}
 
-        Passos do Processo:
-        {steps}
+Passos do Processo:
+{steps}
 
-        Baseado nas informações acima, identifique:
-
-        1. Tipos de Dados - Exemplos:
-        - Dados financeiros (valores, impostos)
-        - Documentos fiscais (notas fiscais, NFe)
-        - Dados cadastrais (CNPJ, informações de fornecedores)
-        - Dados de controle (status, datas)
-
-        2. Formatos de Dados - Exemplos:
-        - PDF (documentos, notas fiscais)
-        - Excel (planilhas de controle)
-        - Email (comunicações)
-        - Dados estruturados (SAP, sistemas)
-
-        3. Fontes de Dados - Exemplos:
-        - Email (Outlook)
-        - Sistemas (SAP, OCR)
-        - Portais web (Receita Federal)
-        - Arquivos compartilhados (SharePoint)
-
-        4. Volume de Dados:
-        - Baixo: menos de 100 transações/dia
-        - Médio: entre 100 e 1000 transações/dia
-        - Alto: mais de 1000 transações/dia
-
-        Retorne um objeto JSON com a seguinte estrutura exata:
-        {
-            "types": ["lista de tipos de dados identificados"],
-            "formats": ["lista de formatos identificados"],
-            "sources": ["lista de fontes identificadas"],
-            "volume": "Baixo/Médio/Alto baseado na análise"
-        }
-
-        Importante: Baseie-se apenas em informações explicitamente mencionadas na descrição e nos passos.
-        """
+Retorne apenas um objeto JSON com esta estrutura exata, sem texto adicional:
+{{
+    "types": ["lista de tipos de dados identificados"],
+    "formats": ["lista de formatos identificados"],
+    "sources": ["lista de fontes identificadas"],
+    "volume": "Baixo/Médio/Alto baseado na análise"
+}}"""
         
         try:
-            chain = LLMChain(llm=self.llm, prompt=ChatPromptTemplate.from_template(template))
+            # Cria e executa a chain
+            chain = LLMChain(
+                llm=self.llm,
+                prompt=ChatPromptTemplate.from_template(template)
+            )
+            
+            # Executa a chain
             result = chain.invoke({
                 "description": description,
                 "steps": "\n".join(f"- {step}" for step in steps)
             })
             
-            # Converte resultado para dict
-            data = json.loads(result['text'].strip())
+            # Limpa a resposta e extrai o JSON
+            response_text = result['text'].strip()
             
-            # Valida se todos os campos necessários estão presentes
-            if not all(key in data for key in ["types", "formats", "sources", "volume"]):
-                raise ValueError("Resposta da IA incompleta")
+            # Garante que estamos pegando apenas o JSON
+            start_idx = response_text.find('{')
+            end_idx = response_text.rfind('}') + 1
+            if start_idx == -1 or end_idx == 0:
+                raise ValueError("Não foi possível encontrar JSON na resposta")
+            
+            json_str = response_text[start_idx:end_idx]
+            
+            # Parse do JSON
+            data = json.loads(json_str)
+            
+            # Validação explícita dos campos
+            required_fields = ["types", "formats", "sources", "volume"]
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                raise ValueError(f"Campos obrigatórios ausentes: {', '.join(missing_fields)}")
             
             return data
             
         except Exception as e:
             logger.error(f"Erro ao inferir dados do processo: {str(e)}")
+            # Retorna valores padrão em caso de erro
             return {
-                "types": ["Dados financeiros", "Documentos fiscais"],  # valores padrão mais específicos
+                "types": ["Dados financeiros", "Documentos fiscais"],
                 "formats": ["PDF", "Excel"],
                 "sources": ["Email", "Sistema"],
                 "volume": "Médio"
