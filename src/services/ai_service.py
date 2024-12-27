@@ -1,10 +1,11 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Dict
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain
 import json
 import logging
+from src.utils.diagram_validator import DiagramValidator
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +18,13 @@ class MermaidDiagram:
 class AIService:
     """Serviço para geração de conteúdo usando IA."""
     
-    def __init__(self):
-        self.llm = ChatOpenAI(
+    def __init__(self, llm=None):
+        # Se não for fornecido um LLM, cria um novo
+        self.llm = llm if llm is not None else ChatOpenAI(
             temperature=0.7,
             model="gpt-3.5-turbo"
         )
+        self.diagram_validator = DiagramValidator()
     
     def generate_diagram(self, process_description: str, steps: List[str]) -> MermaidDiagram:
         """Gera um diagrama Mermaid baseado na descrição do processo e seus passos."""
@@ -31,7 +34,7 @@ class AIService:
         if not steps or not isinstance(steps, list) or not all(steps):
             raise ValueError("Descrição do processo e passos são obrigatórios")
             
-            # Template do prompt
+        # Template do prompt
         template = """
         Você é um especialista em criar diagramas de fluxo usando Mermaid.
         Crie um diagrama de fluxo que represente o processo descrito abaixo.
@@ -237,77 +240,139 @@ class AIService:
             raise ValueError(f"Erro ao processar resposta da IA: {str(e)}")
 
     def analyze_process_description(self, description: str) -> dict:
-        """Analisa a descrição do processo e sugere melhorias."""
-        template = """
-        Você é um especialista em análise de processos para automação RPA.
-        Analise a seguinte descrição de processo e extraia informações relevantes para automação RPA.
-        
-        Descrição: {description}
-        
-        Por favor, identifique e retorne no formato JSON:
-        {{
-            "steps_as_is": ["passo 1", "passo 2", ...],
-            "systems": ["sistema 1", "sistema 2", ...],
-            "business_rules": ["regra 1", "regra 2", ...],
-            "exceptions": ["exceção 1", "exceção 2", ...],
-            "automation_goals": ["objetivo 1", "objetivo 2", ...],
-            "kpis": ["kpi 1", "kpi 2", ...]
-        }}
-        
-        Seja específico e detalhado nas sugestões, não se limite apenas a termos genéricos.
-        """
-        
+        """Analisa a descrição do processo e retorna sugestões estruturadas."""
         try:
-            # Gera sugestões iniciais
-            chain = LLMChain(llm=self.llm, prompt=ChatPromptTemplate.from_template(template))
+            # Template atualizado e corrigido
+            template = """Você é um especialista em análise de processos RPA.
+Analise a descrição do processo abaixo e extraia informações estruturadas.
+
+Descrição do Processo:
+{description}
+
+Ao analisar o processo, considere as seguintes regras de validação do diagrama:
+1. Deve haver exatamente um ponto de início
+2. Deve haver pelo menos um ponto de fim
+3. Todos os nós devem estar conectados
+4. Não deve haver ciclos que causem loops infinitos
+5. Todas as conexões devem ser entre nós existentes
+
+Retorne um objeto JSON com a seguinte estrutura, sem texto adicional:
+{{
+    "steps_as_is": ["lista ordenada de etapas"],
+    "details": {{
+        "steps": ["lista detalhada de etapas"],
+        "tools": ["sistemas e ferramentas identificados"],
+        "data_types": ["tipos de dados manipulados"],
+        "data_formats": ["formatos de dados"],
+        "data_sources": ["fontes de dados"],
+        "data_volume": "Baixo/Médio/Alto"
+    }},
+    "business_rules": {{
+        "business_rules": ["regras identificadas"],
+        "exceptions": ["exceções identificadas"]
+    }},
+    "automation_goals": {{
+        "automation_goals": ["objetivos da automação"],
+        "kpis": ["KPIs sugeridos"]
+    }},
+    "diagram_validation": {{
+        "start_node": "identificador do nó inicial",
+        "end_nodes": ["identificadores dos nós finais"],
+        "connections": [{{"source": "id_origem", "target": "id_destino"}}]
+    }}
+}}"""
+            # Executa a análise
+            chain = LLMChain(
+                llm=self.llm,
+                prompt=ChatPromptTemplate.from_template(template)
+            )
+            
             result = chain.invoke({"description": description})
-            suggestions = json.loads(result['text'].strip())
             
-            # Adiciona inferência de dados do processo
-            process_data = self.infer_process_data(description, suggestions.get('steps_as_is', []))
+            # Processa e valida o resultado
+            data = self._process_ai_response(result['text'])
             
-            # Estrutura o retorno de forma consistente
-            return {
-                'steps_as_is': suggestions.get('steps_as_is', []),
-                'details': {
-                    'steps': suggestions.get('steps_as_is', []),
-                    'tools': suggestions.get('systems', []),
-                    'data_types': process_data.get('types', []),
-                    'data_formats': process_data.get('formats', []),
-                    'data_sources': process_data.get('sources', []),
-                    'data_volume': process_data.get('volume', 'Médio')
-                },
-                'business_rules': {
-                    'business_rules': suggestions.get('business_rules', []),
-                    'exceptions': suggestions.get('exceptions', [])
-                },
-                'automation_goals': {
-                    'automation_goals': suggestions.get('automation_goals', []),
-                    'kpis': suggestions.get('kpis', [])
-                }
-            }
+            # Valida o diagrama sugerido
+            if 'diagram_validation' in data:
+                nodes = self._convert_steps_to_nodes(data['steps_as_is'])
+                edges = data['diagram_validation'].get('connections', [])
+                
+                is_valid, errors = self.diagram_validator.validate_diagram(nodes, edges)
+                if not is_valid:
+                    logger.warning(f"Diagrama sugerido tem problemas: {errors}")
+                    # Tenta corrigir o diagrama
+                    data = self._fix_diagram_issues(data, errors)
+            
+            return data
+            
         except Exception as e:
             logger.error(f"Erro ao analisar descrição: {str(e)}")
-            # Retorna estrutura vazia mas consistente em caso de erro
-            return {
-                'steps_as_is': [],
-                'details': {
-                    'steps': [],
-                    'tools': [],
-                    'data_types': [],
-                    'data_formats': [],
-                    'data_sources': [],
-                    'data_volume': 'Médio'
-                },
-                'business_rules': {
-                    'business_rules': [],
-                    'exceptions': []
-                },
-                'automation_goals': {
-                    'automation_goals': [],
-                    'kpis': []
-                }
+            return {}
+
+    def _convert_steps_to_nodes(self, steps: List[str]) -> List[Dict]:
+        """Converte lista de etapas em nós do diagrama."""
+        return [
+            {
+                'id': f"step_{i}",
+                'name': step,
+                'type': 'action' if i not in [0, len(steps)-1] 
+                        else ('start' if i == 0 else 'end')
             }
+            for i, step in enumerate(steps)
+        ]
+
+    def _fix_diagram_issues(self, data: Dict, errors: List[str]) -> Dict:
+        """Tenta corrigir problemas identificados no diagrama."""
+        steps = data['steps_as_is']
+        
+        # Garante nó inicial
+        if "nó de início" in " ".join(errors):
+            if steps:
+                steps.insert(0, "Início do processo")
+        
+        # Garante nó final
+        if "nó de fim" in " ".join(errors):
+            steps.append("Fim do processo")
+        
+        # Atualiza conexões
+        connections = []
+        for i in range(len(steps)-1):
+            connections.append({
+                'source': f"step_{i}",
+                'target': f"step_{i+1}"
+            })
+        
+        # Atualiza o diagrama validado
+        data['diagram_validation'] = {
+            'start_node': "step_0",
+            'end_nodes': [f"step_{len(steps)-1}"],
+            'connections': connections
+        }
+        
+        return data
+
+    def _process_ai_response(self, response: str) -> dict:
+        """Processa e valida a resposta da IA."""
+        try:
+            # Extrai apenas o JSON da resposta
+            start_idx = response.find('{')
+            end_idx = response.rfind('}') + 1
+            if start_idx == -1 or end_idx == 0:
+                raise ValueError("JSON não encontrado na resposta")
+            
+            json_str = response[start_idx:end_idx]
+            data = json.loads(json_str)
+            
+            # Validação básica dos campos
+            required_fields = ["steps_as_is", "details", "business_rules", "automation_goals"]
+            if not all(field in data for field in required_fields):
+                raise ValueError("Campos obrigatórios ausentes na resposta")
+            
+            return data
+            
+        except Exception as e:
+            logger.error(f"Erro ao processar resposta da IA: {str(e)}")
+            raise
 
     def validate_and_fix_mermaid(self, mermaid_code: str) -> str:
         """Valida e corrige o código Mermaid usando IA."""
@@ -518,46 +583,9 @@ Retorne apenas um objeto JSON com esta estrutura exata, sem texto adicional:
             
         except Exception as e:
             logger.error(f"Erro ao inferir dados do processo: {str(e)}")
-            # Retorna valores padrão em caso de erro
             return {
                 "types": ["Dados financeiros", "Documentos fiscais"],
                 "formats": ["PDF", "Excel"],
                 "sources": ["Email", "Sistema"],
                 "volume": "Médio"
             }
-
-    def get_mock_description(self) -> str:
-        """Retorna uma descrição de processo mock para testes."""
-        return """
-        Processo de Validação e Processamento de Notas Fiscais Eletrônicas
-
-        O processo inicia quando o departamento financeiro recebe notas fiscais eletrônicas (NFe) por email dos fornecedores. 
-        O assistente financeiro acessa a caixa de entrada do Outlook a cada 2 horas para verificar novos emails com NFes anexadas em PDF.
-
-        Para cada nota fiscal recebida, o assistente deve:
-        1. Baixar o arquivo PDF do email
-        2. Extrair os dados principais usando o sistema OCR interno
-        3. Acessar o portal da Receita Federal para validar a autenticidade da NFe
-        4. Inserir os dados no sistema SAP, módulo financeiro
-        5. Atualizar a planilha de controle no Excel com status e valores
-        6. Enviar email de confirmação para o fornecedor
-        7. Arquivar o PDF em pasta compartilhada no SharePoint
-
-        Regras importantes:
-        - Notas fiscais acima de R$ 50.000 precisam de aprovação do gerente
-        - Fornecedor deve estar cadastrado e ativo no SAP
-        - Data de emissão não pode ser superior a 30 dias
-        - CNPJ do fornecedor deve ser válido
-        - Valores e impostos devem estar corretos conforme legislação
-
-        Exceções comuns:
-        - Sistema SAP fora do ar
-        - PDF ilegível ou corrompido
-        - Nota fiscal cancelada ou já processada
-        - Divergência nos cálculos de impostos
-        - Fornecedor bloqueado ou inativo
-
-        O volume médio é de 200 notas fiscais por dia, com picos de até 500 em fechamento de mês.
-        O objetivo é automatizar este processo para reduzir erros de digitação, agilizar o processamento
-        e garantir conformidade fiscal. Atualmente, cada nota leva em média 15 minutos para ser processada manualmente.
-        """

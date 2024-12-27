@@ -1,327 +1,327 @@
+from typing import List, Dict
 import streamlit as st
-from typing import Optional
-import json
+from streamlit_agraph import agraph, Node, Edge, Config
+from src.utils.diagram_validator import DiagramValidator
+from src.services.mermaid_service import MermaidService
 
-def render_diagram_editor(mermaid_code: str, on_save: Optional[callable] = None):
-    """Renderiza o editor visual de diagrama Mermaid."""
-    if 'diagram_editor' not in st.session_state:
-        st.session_state.diagram_editor = {
-            'code': mermaid_code,
-            'show_editor': False,
-            'current_node': None,
-            'nodes': [],
-            'connections': []
-        }
+class DiagramEditor:
+    """Editor visual de diagramas de processo."""
     
-    # Parse o código Mermaid atual
-    try:
-        # Extrai nós e conexões do código atual
-        lines = mermaid_code.split('\n')
+    NODE_TYPES = {
+        'start': {'label': '🟢 Início', 'color': '#f9f9f9'},
+        'action': {'label': '🔷 Ação', 'color': '#bbdefb'},
+        'decision': {'label': '💠 Decisão', 'color': '#fff59d'},
+        'system': {'label': '🖥️ Sistema', 'color': '#c8e6c9'},
+        'end': {'label': '🔴 Fim', 'color': '#f9f9f9'}
+    }
+    
+    def __init__(self):
+        if 'diagram_state' not in st.session_state:
+            st.session_state.diagram_state = {
+                'selected_node': None,
+                'nodes': self._convert_steps_to_nodes(),
+                'edges': [],
+                'canvas_scale': 1.0,
+                'canvas_offset': {'x': 0, 'y': 0},
+                'editing_edge': False
+            }
+        self.validator = DiagramValidator()
+        self.mermaid_service = MermaidService()
+    
+    def _convert_steps_to_nodes(self) -> List[Dict]:
+        """Converte as etapas do processo em nós do diagrama."""
+        if 'process_steps' not in st.session_state:
+            return []
+            
+        return [
+            {
+                'id': step['id'],
+                'name': step['name'],
+                'type': step.get('type', 'action'),
+                'description': step.get('description', ''),
+                'dependencies': step.get('dependencies', [])
+            }
+            for step in st.session_state.process_steps
+        ]
+    
+    def _sync_with_process_steps(self):
+        """Sincroniza o diagrama com as etapas do processo."""
+        # Atualiza os nós com base nas etapas
+        current_nodes = {node['id']: node for node in st.session_state.diagram_state['nodes']}
+        process_steps = {step['id']: step for step in st.session_state.process_steps}
+        
+        # Adiciona novos nós
+        for step_id, step in process_steps.items():
+            if step_id not in current_nodes:
+                new_node = {
+                    'id': step_id,
+                    'name': step['name'],
+                    'type': step.get('type', 'action'),
+                    'description': step.get('description', ''),
+                    'dependencies': step.get('dependencies', [])
+                }
+                st.session_state.diagram_state['nodes'].append(new_node)
+        
+        # Remove nós que não existem mais nas etapas
+        st.session_state.diagram_state['nodes'] = [
+            node for node in st.session_state.diagram_state['nodes']
+            if node['id'] in process_steps
+        ]
+        
+        # Atualiza as conexões com base nas dependências
+        edges = []
+        for node in st.session_state.diagram_state['nodes']:
+            for dep in node.get('dependencies', []):
+                edges.append({
+                    'source': dep,
+                    'target': node['id'],
+                    'label': 'depende de'
+                })
+        st.session_state.diagram_state['edges'] = edges
+    
+    def render_canvas(self):
+        """Renderiza a área principal do diagrama."""
         nodes = []
-        connections = []
+        edges = []
         
-        for line in lines:
-            line = line.strip()
-            if line.startswith('flowchart TD'):
-                continue
-            elif '-->' in line:  # Conexão
-                parts = line.split('-->')
-                from_node = parts[0].strip()
-                to_part = parts[1].strip()
-                
-                # Extrai o label se existir
-                if '|' in to_part:
-                    label_parts = to_part.split('|')
-                    to_node = label_parts[2].strip()
-                    label = label_parts[1].strip()
-                else:
-                    to_node = to_part
-                    label = ''
-                
-                # Remove possíveis colchetes do to_node
-                if '[' in to_node:
-                    to_node = to_node.split('[')[0].strip()
-                
-                connections.append({
-                    'from': from_node,
-                    'to': to_node,
-                    'label': label
-                })
-            elif line and '[' in line:  # Nó
-                parts = line.split('[', 1)
-                node_id = parts[0].strip()
-                node_label = parts[1].rsplit(']', 1)[0]
-                
-                # Determina o tipo de forma
-                shape = 'box'
-                if '((' in line and '))' in line:
-                    shape = 'circle'
-                elif '{' in line and '}' in line:
-                    shape = 'diamond'
-                elif '{{' in line and '}}' in line:
-                    shape = 'hexagon'
-                
-                nodes.append({
-                    'id': node_id,
-                    'label': node_label,
-                    'shape': shape
-                })
+        # Converte nós para formato do agraph
+        for node in st.session_state.diagram_state['nodes']:
+            nodes.append(Node(
+                id=node['id'],
+                label=node['name'],
+                size=25,
+                color=self.NODE_TYPES[node['type']]['color'],
+                shape='dot' if node['type'] in ['start', 'end'] else 'box'
+            ))
         
-        st.session_state.diagram_editor['nodes'] = nodes
-        st.session_state.diagram_editor['connections'] = connections
+        # Converte arestas
+        for edge in st.session_state.diagram_state['edges']:
+            edges.append(Edge(
+                source=edge['source'],
+                target=edge['target'],
+                label=edge.get('label', ''),
+                type="CURVE_SMOOTH"
+            ))
         
-    except Exception as e:
-        st.error(f"Erro ao processar diagrama: {str(e)}")
-        st.session_state.diagram_editor['nodes'] = []
-        st.session_state.diagram_editor['connections'] = []
+        # Configuração do diagrama
+        config = Config(
+            width=800,
+            height=500,
+            directed=True,
+            physics=True,
+            hierarchical=True,
+            nodeHighlightBehavior=True,
+            highlightColor="#F7A7A6",
+            collapsible=False
+        )
+        
+        # Renderiza o diagrama interativo
+        selected = agraph(
+            nodes=nodes, 
+            edges=edges, 
+            config=config
+        )
+        
+        # Atualiza o nó selecionado se houver mudança
+        if selected and selected != st.session_state.diagram_state['selected_node']:
+            st.session_state.diagram_state['selected_node'] = selected
+            st.rerun()
     
-    # Interface do Editor
-    with st.expander("✏️ Editor de Diagrama", expanded=st.session_state.diagram_editor['show_editor']):
-        # Tabs para diferentes aspectos do editor
-        tab_nodes, tab_connections, tab_style = st.tabs(["Nós", "Conexões", "Estilo"])
+    def render_toolbar(self):
+        """Renderiza a barra de ferramentas."""
+        st.write("### 🛠️ Ferramentas")
         
-        with tab_nodes:
-            st.write("### Nós do Diagrama")
-            
-            # Lista de nós existentes
-            st.write("**Nós Existentes:**")
-            for idx, node in enumerate(st.session_state.diagram_editor['nodes']):
-                col1, col2, col3, col4 = st.columns([2, 2, 1, 1])
-                with col1:
-                    new_id = st.text_input("ID", node['id'], key=f"node_id_{idx}")
-                with col2:
-                    new_label = st.text_input("Label", node['label'], key=f"node_label_{idx}")
-                with col3:
-                    shape = st.selectbox("Forma", 
-                                       ["box", "circle", "diamond", "hexagon"],
-                                       index=["box", "circle", "diamond", "hexagon"].index(node.get('shape', 'box')),
-                                       key=f"node_shape_{idx}")
-                with col4:
-                    if st.button("🗑️", key=f"del_node_{idx}"):
-                        st.session_state.diagram_editor['nodes'].pop(idx)
-                        st.rerun()
-                
-                # Atualiza o nó
-                node.update({'id': new_id, 'label': new_label, 'shape': shape})
-            
-            # Adicionar novo nó
-            st.write("**Adicionar Novo Nó:**")
-            col1, col2, col3 = st.columns([2, 2, 1])
-            with col1:
-                new_node_id = st.text_input("ID", key="new_node_id")
-            with col2:
-                new_node_label = st.text_input("Label", key="new_node_label")
-            with col3:
-                new_node_shape = st.selectbox("Forma", ["box", "circle", "diamond", "hexagon"])
-            
-            if st.button("➕ Adicionar Nó"):
-                if new_node_id and new_node_label:
-                    st.session_state.diagram_editor['nodes'].append({
-                        'id': new_node_id,
-                        'label': new_node_label,
-                        'shape': new_node_shape
-                    })
-                    st.rerun()
-            
-            # Organização por tipo
-            st.write("### Organização dos Nós")
-            node_organization = st.radio(
-                "Organizar por:",
-                ["Ordem de Criação", "Tipo", "Alfabético"]
-            )
-            
-            nodes = st.session_state.diagram_editor['nodes']
-            if node_organization == "Tipo":
-                nodes = sorted(nodes, key=lambda x: x['shape'])
-            elif node_organization == "Alfabético":
-                nodes = sorted(nodes, key=lambda x: x['label'])
+        # Primeira linha - Operações básicas
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("➕ Novo Nó", key="btn_new_node", use_container_width=True):
+                self._add_new_node()
         
-        with tab_connections:
-            st.write("### Conexões")
-            
-            # Lista de conexões existentes
-            st.write("**Conexões Existentes:**")
-            for idx, conn in enumerate(st.session_state.diagram_editor['connections']):
-                col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-                with col1:
-                    node_ids = [n['id'] for n in st.session_state.diagram_editor['nodes']]
-                    try:
-                        from_index = node_ids.index(conn['from'])
-                    except ValueError:
-                        from_index = 0
-                        # Adiciona o nó ausente à lista
-                        st.session_state.diagram_editor['nodes'].append({
-                            'id': conn['from'],
-                            'label': conn['from'],
-                            'shape': 'box'
-                        })
-                        
-                    from_node = st.selectbox("De", 
-                                           node_ids, 
-                                           index=from_index,
-                                           key=f"conn_from_{idx}")
-                with col2:
-                    try:
-                        to_index = node_ids.index(conn['to'])
-                    except ValueError:
-                        to_index = 0
-                        # Adiciona o nó ausente à lista
-                        st.session_state.diagram_editor['nodes'].append({
-                            'id': conn['to'],
-                            'label': conn['to'],
-                            'shape': 'box'
-                        })
-                        
-                    to_node = st.selectbox("Para", 
-                                         node_ids,
-                                         index=to_index,
-                                         key=f"conn_to_{idx}")
-                with col3:
-                    label = st.text_input("Label", conn.get('label', ''), key=f"conn_label_{idx}")
-                with col4:
-                    if st.button("🗑️", key=f"del_conn_{idx}"):
-                        st.session_state.diagram_editor['connections'].pop(idx)
-                        st.rerun()
-                
-                # Atualiza a conexão
-                conn.update({'from': from_node, 'to': to_node, 'label': label})
-            
-            # Adicionar nova conexão
-            st.write("**Adicionar Nova Conexão:**")
-            col1, col2, col3 = st.columns([2, 2, 2])
-            with col1:
-                new_conn_from = st.selectbox("De", [n['id'] for n in st.session_state.diagram_editor['nodes']], key="new_conn_from")
-            with col2:
-                new_conn_to = st.selectbox("Para", [n['id'] for n in st.session_state.diagram_editor['nodes']], key="new_conn_to")
-            with col3:
-                new_conn_label = st.text_input("Label", key="new_conn_label")
-            
-            if st.button("➕ Adicionar Conexão"):
-                st.session_state.diagram_editor['connections'].append({
-                    'from': new_conn_from,
-                    'to': new_conn_to,
-                    'label': new_conn_label
-                })
-                st.rerun()
+        with col2:
+            if st.button("🔗 Conectar", key="btn_connect", use_container_width=True):
+                st.session_state.diagram_state['editing_edge'] = True
         
-        with tab_style:
-            st.write("### Estilo do Diagrama")
-            
-            # Direção do diagrama
-            direction = st.selectbox(
-                "Direção do Fluxo",
-                ["TD (Top-Down)", "LR (Left-Right)", "RL (Right-Left)", "BT (Bottom-Top)"],
-                index=0
-            )
-            
-            # Cores para diferentes tipos de nós
-            st.write("**Cores dos Nós**")
-            col1, col2 = st.columns(2)
-            with col1:
-                start_end_color = st.color_picker("Início/Fim", "#f9f9f9")
-                action_color = st.color_picker("Ações", "#bbdefb")
-            with col2:
-                decision_color = st.color_picker("Decisões", "#fff59d")
-                system_color = st.color_picker("Sistemas", "#c8e6c9")
-            
-            # Espessura das linhas
-            line_thickness = st.slider("Espessura das Linhas", 1, 5, 2)
-            
-            # Curvas das conexões
-            curve_style = st.selectbox(
-                "Estilo das Conexões",
-                ["Linha Reta", "Curva Suave", "Ângulo Reto"]
-            )
-            
-            # Aplica os estilos ao gerar o código
-            styles = []
-            for node in st.session_state.diagram_editor['nodes']:
-                if node['shape'] == 'circle':
-                    styles.append(f"style {node['id']} fill:{start_end_color},stroke:#333")
-                elif node['shape'] == 'diamond':
-                    styles.append(f"style {node['id']} fill:{decision_color},stroke:#333")
-                elif node['shape'] == 'hexagon':
-                    styles.append(f"style {node['id']} fill:{system_color},stroke:#333")
-                else:
-                    styles.append(f"style {node['id']} fill:{action_color},stroke:#333")
-            
-            # Gera o novo código Mermaid
-            new_code = [f"flowchart {direction.split()[0]}"]
-            
-            # Adiciona nós
-            for node in st.session_state.diagram_editor['nodes']:
-                shape_start, shape_end = {
-                    'box': ['[', ']'],
-                    'circle': ['((', '))'],
-                    'diamond': ['{', '}'],
-                    'hexagon': ['{{', '}}']
-                }.get(node['shape'], ['[', ']'])
-                
-                new_code.append(f"{node['id']}{shape_start}{node['label']}{shape_end}")
-            
-            # Adiciona conexões
-            for conn in st.session_state.diagram_editor['connections']:
-                if conn['label']:
-                    new_code.append(f"{conn['from']} --> |{conn['label']}| {conn['to']}")
-                else:
-                    new_code.append(f"{conn['from']} --> {conn['to']}")
-            
-            # Atualiza o código
-            st.session_state.diagram_editor['code'] = '\n'.join(new_code)
-            
-            # Preview do diagrama
-            st.write("### Preview")
-            st.markdown(f"""
-            ```mermaid
-            {st.session_state.diagram_editor['code']}
-            ```
-            """)
+        with col3:
+            if st.button("🗑️ Excluir", key="btn_delete", use_container_width=True):
+                self._delete_selected()
         
-        # Botões de ação
+        # Segunda linha - Ferramentas adicionais
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("💾 Salvar Alterações", use_container_width=True):
-                if on_save:
-                    on_save(st.session_state.diagram_editor['code'])
-                st.success("Diagrama atualizado com sucesso!")
+            if st.button("🔄 Sincronizar", key="btn_sync", use_container_width=True):
+                self._sync_with_process_steps()
+        
         with col2:
-            if st.button("❌ Cancelar", use_container_width=True):
-                st.session_state.diagram_editor['show_editor'] = False
+            if st.button("✅ Validar", key="btn_validate", use_container_width=True):
+                self._validate_diagram()
+    
+    def render_properties_panel(self):
+        """Renderiza o painel de propriedades."""
+        if st.session_state.diagram_state['selected_node']:
+            st.write("### ⚙️ Propriedades")
+            node = self._get_selected_node()
+            
+            if node:
+                # Nome do nó
+                new_name = st.text_input(
+                    "Nome:",
+                    value=node.get('name', ''),
+                    key="input_node_name"
+                )
+                
+                # Tipo do nó
+                new_type = st.selectbox(
+                    "Tipo:",
+                    options=list(self.NODE_TYPES.keys()),
+                    format_func=lambda x: self.NODE_TYPES[x]['label'],
+                    index=list(self.NODE_TYPES.keys()).index(node.get('type', 'action')),
+                    key="select_node_type"
+                )
+                
+                # Descrição (opcional)
+                new_description = st.text_area(
+                    "Descrição:",
+                    value=node.get('description', ''),
+                    key="input_node_description"
+                )
+                
+                # Atualiza o nó se houver mudanças
+                if (new_name != node.get('name') or 
+                    new_type != node.get('type') or 
+                    new_description != node.get('description')):
+                    self._update_node(node['id'], {
+                        'name': new_name,
+                        'type': new_type,
+                        'description': new_description
+                    })
+        
+        # Modo de edição de conexão
+        elif st.session_state.diagram_state['editing_edge']:
+            st.write("### 🔗 Nova Conexão")
+            self._render_edge_editor()
+    
+    def _render_edge_editor(self):
+        """Renderiza o editor de conexões."""
+        nodes = st.session_state.diagram_state['nodes']
+        
+        if len(nodes) < 2:
+            st.warning("Adicione pelo menos 2 nós para criar uma conexão")
+            return
+        
+        # Seleção de nós
+        source = st.selectbox(
+            "De:",
+            options=[n['id'] for n in nodes],
+            format_func=lambda x: next(n['name'] for n in nodes if n['id'] == x),
+            key="select_edge_source"
+        )
+        
+        target = st.selectbox(
+            "Para:",
+            options=[n['id'] for n in nodes if n['id'] != source],
+            format_func=lambda x: next(n['name'] for n in nodes if n['id'] == x),
+            key="select_edge_target"
+        )
+        
+        # Label opcional
+        label = st.text_input("Rótulo (opcional):", key="input_edge_label")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Confirmar", key="btn_confirm_edge", use_container_width=True):
+                self._add_edge(source, target, label)
+                st.session_state.diagram_state['editing_edge'] = False
                 st.rerun()
+        
+        with col2:
+            if st.button("Cancelar", key="btn_cancel_edge", use_container_width=True):
+                st.session_state.diagram_state['editing_edge'] = False
+                st.rerun()
+    
+    def _add_edge(self, source: str, target: str, label: str = ""):
+        """Adiciona uma nova conexão ao diagrama."""
+        if source and target and source != target:
+            edge = {
+                'source': source,
+                'target': target,
+                'label': label
+            }
+            st.session_state.diagram_state['edges'].append(edge)
+    
+    def _update_node(self, node_id: str, properties: Dict):
+        """Atualiza as propriedades de um nó."""
+        nodes = st.session_state.diagram_state['nodes']
+        for i, node in enumerate(nodes):
+            if node['id'] == node_id:
+                nodes[i].update(properties)
+                break
+    
+    def _add_new_node(self):
+        """Adiciona um novo nó ao diagrama."""
+        new_id = f"node_{len(st.session_state.diagram_state['nodes'])}"
+        new_node = {
+            'id': new_id,
+            'name': f"Nova Etapa {len(st.session_state.diagram_state['nodes']) + 1}",
+            'type': 'action'
+        }
+        st.session_state.diagram_state['nodes'].append(new_node)
+    
+    def _delete_selected(self):
+        """Remove o nó ou conexão selecionada."""
+        if st.session_state.diagram_state['selected_node']:
+            # Remove o nó
+            nodes = st.session_state.diagram_state['nodes']
+            nodes = [n for n in nodes if n['id'] != st.session_state.diagram_state['selected_node']]
+            st.session_state.diagram_state['nodes'] = nodes
+            
+            # Remove as conexões relacionadas
+            edges = st.session_state.diagram_state['edges']
+            edges = [e for e in edges if e['source'] != st.session_state.diagram_state['selected_node'] 
+                    and e['target'] != st.session_state.diagram_state['selected_node']]
+            st.session_state.diagram_state['edges'] = edges
+            
+            st.session_state.diagram_state['selected_node'] = None
+    
+    def _get_selected_node(self) -> Dict:
+        """Retorna o nó selecionado."""
+        if st.session_state.diagram_state['selected_node']:
+            for node in st.session_state.diagram_state['nodes']:
+                if node['id'] == st.session_state.diagram_state['selected_node']:
+                    return node
+        return {}
+    
+    def _validate_diagram(self):
+        """Valida o diagrama atual."""
+        is_valid, errors = self.validator.validate_diagram(
+            st.session_state.diagram_state['nodes'],
+            st.session_state.diagram_state['edges']
+        )
+        
+        if is_valid:
+            st.success("✅ Diagrama válido!")
+        else:
+            st.error("❌ Problemas encontrados no diagrama:")
+            for error in errors:
+                st.warning(f"• {error}")
 
-    return st.session_state.diagram_editor['code']
-
-def validate_node(node_id: str, node_label: str) -> tuple[bool, str]:
-    """Valida um nó antes de adicionar/atualizar."""
-    if not node_id:
-        return False, "ID do nó não pode estar vazio"
-    if not node_label:
-        return False, "Label do nó não pode estar vazio"
-    if ' ' in node_id:
-        return False, "ID do nó não pode conter espaços"
-    if any(c in node_id for c in '[]{}()'):
-        return False, "ID do nó não pode conter caracteres especiais"
-    return True, ""
-
-# Adicionar templates
-st.write("### Templates")
-template = st.selectbox(
-    "Carregar Template",
-    ["Personalizado", "Processo Linear", "Processo com Decisões", "Integração de Sistemas"]
-)
-
-if template != "Personalizado" and st.button("Carregar Template"):
-    if template == "Processo Linear":
-        # Carrega template de processo linear
-        nodes = [
-            {"id": "start", "label": "Início", "shape": "circle"},
-            {"id": "step1", "label": "Etapa 1", "shape": "box"},
-            {"id": "step2", "label": "Etapa 2", "shape": "box"},
-            {"id": "end", "label": "Fim", "shape": "circle"}
-        ]
-        connections = [
-            {"from": "start", "to": "step1", "label": ""},
-            {"from": "step1", "to": "step2", "label": ""},
-            {"from": "step2", "to": "end", "label": ""}
-        ]
-    # ... outros templates
+def render_diagram_editor():
+    """Função principal para renderizar o editor de diagrama."""
+    editor = DiagramEditor()
+    
+    # Layout principal
+    st.write("## 📊 Editor de Diagrama")
+    
+    # Divide a tela em duas colunas
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        # Container para o diagrama
+        with st.container():
+            # Área principal do diagrama
+            editor.render_canvas()
+    
+    with col2:
+        # Barra de ferramentas e propriedades
+        editor.render_toolbar()
+        st.divider()
+        editor.render_properties_panel()

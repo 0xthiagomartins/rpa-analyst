@@ -1,80 +1,55 @@
+from typing import List, Dict
 import streamlit as st
-from src.services.ai_service import AIService
-from src.views.components.diagram_editor import render_diagram_editor
-import streamlit_mermaid as stmd
+from streamlit_mermaid import st_mermaid
+from src.services.mermaid_service import MermaidService
 
-
-def clean_mermaid_code(code: str) -> str:
-    """Remove marcações Markdown do código Mermaid."""
-    # Remove ```mermaid e ``` do início e fim
-    code = code.strip()
-    if code.startswith("```mermaid"):
-        code = code[len("```mermaid"):].strip()
-    if code.endswith("```"):
-        code = code[:-3].strip()
-    return code
-
-def render_process_diagram(process_data: dict):
-    """Renderiza o diagrama do processo."""
-    st.write("### Diagrama do Processo")
+def render_process_diagram(steps: List[Dict] = None):
+    """Renderiza o diagrama do processo usando Mermaid."""
+    if not steps:
+        steps = st.session_state.get('process_steps', [])
     
-    # Verifica se já existe um diagrama gerado
-    if 'diagram_code' not in st.session_state:
-        # Mostra botão de gerar diagrama
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            if st.button("🎨 Gerar Diagrama", 
-                        type="primary",
-                        use_container_width=True):
-                with st.spinner("Gerando diagrama do processo..."):
-                    try:
-                        # Gera o diagrama
-                        ai_service = AIService()
-                        mermaid_code = ai_service.generate_process_diagram(process_data)
-                        
-                        # Limpa o código
-                        mermaid_code = clean_mermaid_code(mermaid_code)
-                        if not mermaid_code.startswith("flowchart"):
-                            mermaid_code = "flowchart TD\n" + mermaid_code
-                        
-                        st.session_state.diagram_code = mermaid_code
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao gerar diagrama: {str(e)}")
-    else:
-        # Exibe o diagrama
-        st.markdown("""
-        <style>
-        .mermaid {
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-            margin: 10px 0;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+    if not steps:
+        st.info("Nenhuma etapa definida ainda.")
+        return
+    
+    # Gera o código Mermaid
+    mermaid_code = generate_mermaid_diagram(steps)
+    
+    # Valida o código
+    mermaid_service = MermaidService()
+    if not mermaid_service.validate_mermaid_syntax(mermaid_code):
+        st.warning("⚠️ O diagrama gerado pode conter erros de sintaxe")
+    
+    # Renderiza o diagrama
+    st.write("### 📊 Diagrama do Processo")
+    st_mermaid(mermaid_code)
+
+def generate_mermaid_diagram(steps: List[Dict]) -> str:
+    """Gera o código Mermaid para o diagrama."""
+    mermaid_lines = ["flowchart TD"]
+    
+    # Adiciona os nós
+    for step in steps:
+        node_id = step['id']
+        # Sanitiza o texto do nó
+        node_label = step['name'].replace('ç', 'c').replace('ã', 'a').replace('á', 'a')
+        node_type = step.get('type', 'action')
         
-        # Garante que o código está limpo antes de renderizar
-        diagram_code = clean_mermaid_code(st.session_state.diagram_code)
-        stmd.st_mermaid(diagram_code)
-        
-        # Botões de ação
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col1:
-            if st.button("🔄 Regenerar", use_container_width=True):
-                del st.session_state.diagram_code
-                st.rerun()
-        with col2:
-            if st.button("✏️ Editar", use_container_width=True):
-                st.session_state.show_editor = True
-        with col3:
-            if st.button("📋 Ver Código", use_container_width=True):
-                st.code(diagram_code, language="mermaid")
-        
-        # Mostra editor se necessário
-        if st.session_state.get('show_editor', False):
-            render_diagram_editor(
-                diagram_code,
-                on_save=lambda code: st.session_state.update({'diagram_code': code})
-            ) 
+        # Adiciona o nó com estilo baseado no tipo
+        mermaid_lines.append(f"    {node_id}[\"{node_label}\"]:::{node_type}")
+    
+    # Adiciona as conexões baseadas nas dependências
+    for step in steps:
+        for dep in step.get('dependencies', []):
+            mermaid_lines.append(f"    {dep} --> {step['id']}")
+    
+    # Adiciona estilos para cada tipo de nó
+    mermaid_lines.extend([
+        "    classDef action fill:#bbdefb,stroke:#333,stroke-width:2px",
+        "    classDef decision fill:#fff59d,stroke:#333,stroke-width:2px",
+        "    classDef system fill:#c8e6c9,stroke:#333,stroke-width:2px",
+        "    classDef start fill:#f9f9f9,stroke:#333,stroke-width:2px",
+        "    classDef end fill:#f9f9f9,stroke:#333,stroke-width:2px"
+    ])
+    
+    return "\n".join(mermaid_lines) 

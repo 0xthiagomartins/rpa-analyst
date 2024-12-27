@@ -13,3 +13,4 @@ streamlit-mermaid>=0.1.0
 svglib>=1.5.1
 requests>=2.31.0
 streamlit-sortables>=0.1.0
+streamlit-agraph>=0.0.45

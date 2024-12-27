@@ -102,12 +102,11 @@ def load_form_options():
         config_path = Path(__file__).parent.parent.parent.parent / 'config' / 'form_options.yaml'
         with open(config_path, 'r', encoding='utf-8') as f:
             options = yaml.safe_load(f)
-            
         # Verifica se todas as chaves necessárias existem
-        default_options = get_default_options()
-        for key in default_options:
+        default_option = get_default_options()
+        for key in default_option:
             if key not in options:
-                options[key] = default_options[key]
+                options[key] = default_option[key]
                 
         return options
     except Exception as e:
@@ -705,7 +704,13 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
     st.write("### 📝 Detalhes do Processo")
     
     # Tabs principais para organizar o conteúdo
-    tab_steps, tab_systems, tab_data = st.tabs(["📋 Etapas", "🔧 Sistemas", "📊 Dados"])
+    tab_steps, tab_diagram, tab_editor, tab_systems, tab_data = st.tabs([
+        "📋 Etapas",
+        "📊 Diagrama",
+        "✏️ Editor",
+        "🔧 Sistemas",
+        "📊 Dados"
+    ])
     
     with tab_steps:
         # Lista de etapas existentes
@@ -733,6 +738,15 @@ def render_process_details(on_submit: Optional[Callable] = None, initial_data: d
                 'updated_at': datetime.now().isoformat()
             })
             st.rerun()
+    
+    with tab_diagram:
+        # Visualização do diagrama
+        from .process_diagram import render_process_diagram
+        render_process_diagram()
+    
+    with tab_editor:
+        # Editor visual do diagrama
+        render_diagram_editor()
     
     with tab_systems:
         col1, col2 = st.columns(2)

@@ -13,6 +13,9 @@ import json
 import requests
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
+from ..views.components.process_diagram import generate_mermaid_diagram
+from src.utils.diagram_validator import DiagramValidator
+from src.services.mermaid_service import MermaidService
 
 class DocumentService:
     """Serviço para geração de documentos PDD."""
@@ -34,6 +37,8 @@ class DocumentService:
         self.output_dir = self._ensure_output_dir()
         self.styles = getSampleStyleSheet()
         self._create_custom_styles()
+        self.diagram_validator = DiagramValidator()
+        self.mermaid_service = MermaidService()
     
     def _ensure_output_dir(self) -> str:
         """Garante que o diretório de saída existe."""
@@ -258,8 +263,8 @@ class DocumentService:
             
         except Exception as e:
             logger.error(f"Erro ao converter diagrama: {str(e)}")
-            return None
-
+        return None
+    
     def _add_diagram_section(self, elements: list, mermaid_code: str):
         """Adiciona seção do diagrama ao documento."""
         elements.append(Paragraph("Diagrama do Processo", self.styles['SectionTitle']))
@@ -291,6 +296,56 @@ class DocumentService:
                 "Erro ao gerar diagrama do processo.",
                 self.styles['CustomBody']
             ))
+
+    def _add_process_diagram(self, elements: List, process_data: Dict):
+        """Adiciona o diagrama do processo ao documento."""
+        if not process_data.get('process_steps'):
+            return
+        
+        # Valida o diagrama antes de adicionar
+        nodes = process_data['process_steps']
+        edges = self._extract_edges_from_steps(nodes)
+        is_valid, errors = self.diagram_validator.validate_diagram(nodes, edges)
+        
+        if not is_valid:
+            logger.warning(f"Diagrama com problemas: {errors}")
+            return
+        
+        # Gera o código Mermaid
+        mermaid_code = generate_mermaid_diagram(nodes)
+        
+        # Converte para imagem
+        image_path = self.mermaid_service.mermaid_to_image(mermaid_code)
+        
+        if image_path and os.path.exists(image_path):
+            # Adiciona ao documento
+            elements.extend([
+                Paragraph("Diagrama do Processo", self.styles['Heading2']),
+                Spacer(1, 12),
+                Image(image_path, width=500, height=300),
+                Spacer(1, 12)
+            ])
+            
+            # Remove arquivo temporário
+            os.unlink(image_path)
+        else:
+            # Fallback para código
+            elements.extend([
+                Paragraph("Diagrama do Processo", self.styles['Heading2']),
+                Spacer(1, 12),
+                Paragraph(mermaid_code, self.styles['Code'])
+            ])
+    
+    def _extract_edges_from_steps(self, steps: List[Dict]) -> List[Dict]:
+        """Extrai as conexões das dependências dos passos."""
+        edges = []
+        for step in steps:
+            for dep in step.get('dependencies', []):
+                edges.append({
+                    'source': dep,
+                    'target': step['id']
+                })
+        return edges
 
     def generate_pdd(self, data: dict) -> str:
         """Gera o documento PDD em PDF."""
@@ -394,3 +449,17 @@ class DocumentService:
         except Exception as e:
             logger.error(f"Erro ao gerar PDD: {str(e)}")
             raise ValueError(f"Erro ao gerar documento: {str(e)}") 
+
+    def generate_process_documentation(self, process_data: dict) -> str:
+        """Gera a documentação do processo."""
+        from ..views.components.process_diagram import generate_mermaid_diagram
+        
+        # ... (código anterior mantido)
+        
+        # Adiciona o diagrama do processo
+        if process_data.get('process_steps'):
+            template_data['process_diagram'] = generate_mermaid_diagram(process_data['process_steps'])
+        else:
+            template_data['process_diagram'] = ''
+        
+        # ... (resto do código mantido) 
