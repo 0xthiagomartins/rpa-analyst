@@ -5,3 +5,4 @@ __pycache__
 output/*
 logs/*
 backups/*
+data/migrations/PROC-001/*
