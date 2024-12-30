@@ -6,6 +6,11 @@ from .form_base import FormBase
 class BusinessRulesForm(FormBase):
     """Formulário para regras de negócio e exceções do processo."""
     
+    def __init__(self, container=None):
+        """Inicializa o formulário."""
+        super().__init__(container)
+        self._data: Dict[str, Any] = {}
+    
     def validate(self) -> bool:
         """Valida os dados do formulário."""
         errors = self.validator.validate_form(self._data, "business_rules")
