@@ -1,6 +1,8 @@
+"""Módulo de validadores para o sistema."""
 from typing import Dict, List, Tuple, Any
 from src.utils.context import AppContext
 import re
+from src.utils.config_constants import UI_CONFIG
 
 class ValidationError:
     """Classe para representar erros de validação."""
@@ -42,7 +44,7 @@ class FormValidator:
     def get_field_label(self, field: str) -> str:
         """Retorna o rótulo para um campo específico."""
         return self.config.get_field_label(field)
-
+    
     def validate_email(self, email: str) -> bool:
         """Valida formato de email."""
         pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
@@ -57,3 +59,65 @@ class FormValidator:
     def validate_field_type(self, value: Any, expected_type: type) -> bool:
         """Valida tipo do campo."""
         return isinstance(value, expected_type)
+
+# Funções de validação específicas
+def validate_process_name(name: str) -> bool:
+    """Valida o nome do processo."""
+    if not name or not name.strip():
+        return False
+    
+    if len(name) > UI_CONFIG['MAX_NAME_LENGTH']:
+        return False
+    
+    return True
+
+def validate_process_description(description: str) -> bool:
+    """Valida a descrição do processo."""
+    if not description or not description.strip():
+        return False
+    
+    if len(description) > UI_CONFIG['MAX_DESCRIPTION_LENGTH']:
+        return False
+    
+    return True
+
+def validate_diagram(diagram: str) -> bool:
+    """Valida a sintaxe do diagrama Mermaid."""
+    if not diagram or not diagram.strip():
+        return False
+    
+    required_elements = [
+        'graph',
+        '[',
+        ']',
+        '-->'
+    ]
+    
+    for element in required_elements:
+        if element not in diagram:
+            return False
+    
+    lines = [line.strip() for line in diagram.split('\n') if line.strip()]
+    for line in lines:
+        if '[' in line and ']' in line and '-->' not in line:
+            if not any(line in other_line for other_line in lines if '-->' in other_line):
+                return False
+    
+    return True
+
+def validate_required_fields(data: Dict[str, Any], required: List[str]) -> bool:
+    """Valida se todos os campos obrigatórios estão preenchidos."""
+    if not data or not required:
+        return False
+    
+    for field in required:
+        if field not in data:
+            return False
+        
+        value = data[field]
+        if isinstance(value, str) and not value.strip():
+            return False
+        elif value is None:
+            return False
+    
+    return True

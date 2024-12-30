@@ -1,85 +1,81 @@
-# Opções comuns para os formulários
-common_steps:
-  - "Acessar sistema"
-  - "Extrair dados"
-  - "Processar informações"
-  - "Validar resultados"
-  - "Gerar relatório"
-
-systems:
-  common_tools:
-    - "SAP"
-    - "Excel"
-    - "Outlook"
-    - "SharePoint"
-    - "OCR"
-    - "Portal Receita Federal"
-    - "Teams"
-    - "Power BI"
-    - "Sistema Interno"
-    - "Banco de Dados"
+# Configurações dos formulários de processo
+common_tools:
+  - Microsoft Excel
+  - Microsoft Outlook
+  - SAP
+  - Power BI
+  - SharePoint
+  - Teams
+  - Oracle
+  - Salesforce
+  - ServiceNow
+  - Power Automate
 
 data_types:
-  - "Dados financeiros"
-  - "Documentos fiscais"
-  - "Dados cadastrais"
-  - "Dados de controle"
-  - "Dados pessoais"
-  - "Dados estruturados"
-  - "Dados não estruturados"
-  - "Imagens"
-  - "Textos"
+  - Dados financeiros
+  - Documentos fiscais
+  - Dados cadastrais
+  - Dados de controle
+  - Documentos digitalizados
+  - Planilhas
+  - Emails
+  - Relatórios
+  - Números de protocolo
+  - Valores monetários
+  - Dados de login
+  - Arquivos PDF
 
 data_formats:
-  - "PDF"
-  - "Excel"
-  - "Word"
-  - "CSV"
-  - "TXT"
-  - "JSON"
-  - "XML"
-  - "Email"
-  - "Imagens (JPG/PNG)"
-  - "Dados estruturados"
+  - PDF
+  - Excel
+  - Word
+  - CSV
+  - TXT
+  - XML
+  - JSON
+  - Email
+  - Imagem
+  - Login
+  - Monetário
 
 data_sources:
-  - "Email"
-  - "Sistema SAP"
-  - "Sistema OCR"
-  - "Portal Receita Federal"
-  - "SharePoint"
-  - "Planilhas"
-  - "Banco de dados"
-  - "Arquivos compartilhados"
-  - "Sites/Portais"
-  - "APIs"
+  - Email
+  - Sistema interno
+  - Portal web
+  - Pasta compartilhada
+  - Banco de dados
+  - API
+  - Planilha
+  - Scanner
 
 business_rules_templates:
-  - "Validar dados de entrada"
-  - "Verificar duplicidade"
-  - "Confirmar autorização"
-  - "Registrar log de execução"
-  - "Notificar em caso de erro"
-  - "Backup dos dados processados"
+  - Validação de dados obrigatórios
+  - Verificação de duplicidade
+  - Aprovação por valor
+  - Verificação de prazo
+  - Validação de formato
+  - Checagem de permissões
 
 common_exceptions:
-  - "Sistema indisponível"
-  - "Dados inconsistentes"
-  - "Arquivo não encontrado"
-  - "Permissão negada"
-  - "Timeout de conexão"
-  - "Formato inválido"
+  - Sistema indisponível
+  - Dados inconsistentes
+  - Arquivo corrompido
+  - Timeout de operação
+  - Erro de autenticação
+  - Permissão negada
 
 automation_goals:
-  - "Redução de tempo"
-  - "Eliminação de erros"
-  - "Padronização do processo"
-  - "Aumento de produtividade"
-  - "Melhoria da qualidade"
+  - Redução de tempo de processamento
+  - Eliminação de erros manuais
+  - Padronização do processo
+  - Aumento de produtividade
+  - Melhoria da qualidade
+  - Redução de custos
 
 kpi_templates:
-  - "Tempo médio de processamento"
-  - "Taxa de erro"
-  - "Volume processado"
-  - "Custo por transação"
-  - "Satisfação do usuário" 
+  - Tempo médio de processamento
+  - Taxa de erro
+  - Volume processado
+  - Custo por transação
+  - Tempo de resposta
+  - Satisfação do usuário 

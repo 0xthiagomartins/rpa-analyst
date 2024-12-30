@@ -34,9 +34,9 @@ class AIService:
         if not steps or not isinstance(steps, list) or not all(steps):
             raise ValueError("Descrição do processo e passos são obrigatórios")
             
-        # Template do prompt
-        template = """
-        Você é um especialista em criar diagramas de fluxo usando Mermaid.
+            # Template do prompt
+            template = """
+            Você é um especialista em criar diagramas de fluxo usando Mermaid.
         Crie um diagrama de fluxo que represente o processo descrito abaixo.
         Use a sintaxe flowchart TD do Mermaid.
             
