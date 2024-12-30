@@ -29,23 +29,24 @@ def test_validate_process_description():
 
 def test_validate_diagram():
     """Testa a validação do diagrama."""
-    valid_diagram = """
-    graph TD
+    valid_diagram = """graph TD
     A[Início] --> B[Processo]
-    B --> C[Fim]
-    """
-    
-    invalid_diagram = """
-    graph TD
-    A[Início] --> 
-    """
-    
+    B --> C[Fim]"""
+
+    invalid_diagrams = [
+        "",  # Vazio
+        "invalid",  # Sem sintaxe Mermaid
+        "graph TD\nA[Início] -->",  # Conexão incompleta
+        "graph TD\nA[Início]",  # Sem conexão
+        "graph TD\nA --> B",  # Sem nós definidos
+    ]
+
     # Caso válido
     assert validate_diagram(valid_diagram) == True
-    
+
     # Casos inválidos
-    assert validate_diagram("") == False  # Vazio
-    assert validate_diagram(invalid_diagram) == False  # Sintaxe inválida
+    for diagram in invalid_diagrams:
+        assert validate_diagram(diagram) == False, f"Diagrama deveria ser inválido: {diagram}"
 
 def test_validate_required_fields():
     """Testa a validação de campos obrigatórios."""
