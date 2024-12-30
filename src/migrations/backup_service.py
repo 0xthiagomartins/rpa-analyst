@@ -4,6 +4,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
+import time
 
 from src.utils.migration_logger import MigrationLogger
 
@@ -20,6 +21,7 @@ class BackupService:
         self.backup_dir = Path(backup_dir)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         self.logger = MigrationLogger()
+        self._counter = 0
     
     def create_backup(self, form_name: str, data: Dict[str, Any]) -> Optional[Path]:
         """
@@ -37,19 +39,24 @@ class BackupService:
             form_backup_dir = self.backup_dir / form_name
             form_backup_dir.mkdir(exist_ok=True)
             
-            # Gera nome do arquivo com timestamp
+            # Gera nome único do arquivo com timestamp e contador
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_file = form_backup_dir / f"backup_{timestamp}.json"
+            microsecond = datetime.now().microsecond
+            self._counter += 1
+            backup_file = form_backup_dir / f"backup_{timestamp}_{microsecond}_{self._counter}.json"
+            
+            # Pequeno delay para garantir timestamps diferentes
+            time.sleep(0.001)
             
             # Salva dados
             with open(backup_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
             
-            self.logger.log_info(f"Backup created for {form_name} at {backup_file}")
+            self.logger.info(f"Backup created for {form_name} at {backup_file}")
             return backup_file
             
         except Exception as e:
-            self.logger.log_error(f"Error creating backup for {form_name}", e)
+            self.logger.error(f"Error creating backup for {form_name}", e)
             return None
     
     def restore_backup(self, backup_file: Path) -> Optional[Dict[str, Any]]:
@@ -66,11 +73,11 @@ class BackupService:
             with open(backup_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            self.logger.log_info(f"Backup restored from {backup_file}")
+            self.logger.info(f"Backup restored from {backup_file}")
             return data
             
         except Exception as e:
-            self.logger.log_error(f"Error restoring backup from {backup_file}", e)
+            self.logger.error(f"Error restoring backup from {backup_file}", e)
             return None
     
     def list_backups(self, form_name: Optional[str] = None) -> Dict[str, list]:
@@ -88,13 +95,15 @@ class BackupService:
         if form_name:
             form_dir = self.backup_dir / form_name
             if form_dir.exists():
-                backups[form_name] = [f.name for f in form_dir.glob("backup_*.json")]
+                backups[form_name] = sorted([
+                    f.name for f in form_dir.glob("backup_*.json")
+                ])
         else:
             for form_dir in self.backup_dir.iterdir():
                 if form_dir.is_dir():
-                    backups[form_dir.name] = [
+                    backups[form_dir.name] = sorted([
                         f.name for f in form_dir.glob("backup_*.json")
-                    ]
+                    ])
         
         return backups
     
@@ -116,4 +125,4 @@ class BackupService:
                 # Remove backups excedentes
                 for backup in backups[max_backups:]:
                     backup.unlink()
-                    self.logger.log_info(f"Removed old backup: {backup}") 
+                    self.logger.info(f"Removed old backup: {backup}") 

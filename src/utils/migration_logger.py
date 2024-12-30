@@ -40,31 +40,18 @@ class MigrationLogger:
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
     
-    def start_migration(self, form_name: str) -> None:
-        """Registra início da migração de um formulário."""
-        self.logger.info(f"Starting migration for {form_name}")
+    def info(self, message: str) -> None:
+        """Registra mensagem de info."""
+        self.logger.info(message)
     
-    def end_migration(self, form_name: str, success: bool) -> None:
-        """Registra fim da migração de um formulário."""
-        status = "successfully" if success else "with errors"
-        self.logger.info(f"Migration for {form_name} finished {status}")
+    def error(self, message: str, error: Optional[Exception] = None) -> None:
+        """Registra erro."""
+        self.logger.error(message, exc_info=error)
     
-    def log_error(self, form_name: str, error: Exception, data: Optional[dict] = None) -> None:
-        """Registra erro durante migração."""
-        self.logger.error(
-            f"Error migrating {form_name}: {str(error)}",
-            exc_info=True,
-            extra={"data": data} if data else None
-        )
+    def warning(self, message: str) -> None:
+        """Registra warning."""
+        self.logger.warning(message)
     
-    def log_warning(self, form_name: str, message: str) -> None:
-        """Registra warning durante migração."""
-        self.logger.warning(f"{form_name}: {message}")
-    
-    def log_data_migration(self, form_name: str, old_data: dict, new_data: dict) -> None:
-        """Registra detalhes da migração de dados."""
-        self.logger.debug(
-            f"Data migration for {form_name}:\n"
-            f"Old data: {old_data}\n"
-            f"New data: {new_data}"
-        ) 
+    def debug(self, message: str) -> None:
+        """Registra mensagem de debug."""
+        self.logger.debug(message) 
