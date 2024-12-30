@@ -1,0 +1,12 @@
+{
+    "use_new_forms": false,
+    "identification_migrated": true,
+    "process_details_migrated": true,
+    "business_rules_migrated": false,
+    "automation_goals_migrated": false,
+    "systems_migrated": false,
+    "data_migrated": false,
+    "steps_migrated": false,
+    "risks_migrated": false,
+    "documentation_migrated": false
+}
