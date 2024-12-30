@@ -1,129 +1,145 @@
 """Testes para o serviço de migração."""
 import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch
+from datetime import datetime
 from src.migrations.migration_service import MigrationService
-from src.migrations.feature_flags import MigrationFlag
+from src.migrations.data_mapper import DataMapper
+from src.migrations.validators import DataValidator
+from src.migrations.backup_service import BackupService
 
 @pytest.fixture
 def migration_service():
     """Fixture que cria uma instância do serviço de migração."""
-    return MigrationService()
+    mapper = DataMapper()
+    validator = DataValidator()
+    return MigrationService(mapper=mapper, validator=validator)
 
-@pytest.fixture
-def sample_data():
-    """Fixture com dados de exemplo para migração."""
-    return {
+def test_start_migration_success(migration_service):
+    """Testa início bem sucedido da migração."""
+    form_name = "identification"
+    old_data = {
         "name": "Test Process",
-        "description": "Test Description",
-        "steps": ["Step 1", "Step 2"]
+        "id": "PROC-001",
+        "department": "IT",
+        "owner": "John Doe",
+        "status": "draft"
     }
+    
+    result = migration_service.migrate_identification_form(old_data)
+    
+    assert result["success"] is True
+    assert not result["errors"]
+    assert result["data"] is not None
 
-def test_start_migration_success(migration_service, sample_data, tmp_path):
-    """Testa migração bem sucedida."""
-    # Mock do backup service
-    backup_file = tmp_path / "backup.json"
-    backup_file.touch()
-    migration_service.backup_service.create_backup = Mock(return_value=backup_file)
+def test_start_migration_backup_failure(migration_service, monkeypatch):
+    """Testa falha no backup antes da migração."""
+    def mock_backup_error(*args, **kwargs):
+        raise Exception("Backup failed")
     
-    # Mock do mapeamento
-    migration_service._map_data = Mock(return_value={"migrated": True})
+    monkeypatch.setattr(BackupService, "create_backup", mock_backup_error)
     
-    # Mock da validação
-    migration_service._validate_migration = Mock(return_value=True)
+    old_data = {
+        "name": "Test Process",
+        "id": "PROC-001",
+        "department": "IT",
+        "owner": "John Doe",
+        "status": "draft"
+    }
     
-    result = migration_service.start_migration("identification", sample_data)
+    migration_service.save_error = True
+    result = migration_service.migrate_identification_form(old_data)
     
-    assert result is True
-    migration_service.backup_service.create_backup.assert_called_once()
-    migration_service._map_data.assert_called_once()
-    migration_service._validate_migration.assert_called_once()
+    assert result["success"] is False
+    assert len(result["errors"]) > 0
+    assert result["rollback"]["success"] is True
 
-def test_start_migration_backup_failure(migration_service, sample_data):
-    """Testa falha no backup durante migração."""
-    migration_service.backup_service.create_backup = Mock(return_value=None)
+def test_start_migration_mapping_failure(migration_service, monkeypatch):
+    """Testa falha no mapeamento dos dados."""
+    def mock_mapping_error(*args, **kwargs):
+        raise Exception("Mapping failed")
     
-    result = migration_service.start_migration("identification", sample_data)
+    monkeypatch.setattr(DataMapper, "map_identification_data", mock_mapping_error)
     
-    assert result is False
-    migration_service.backup_service.create_backup.assert_called_once()
+    old_data = {
+        "name": "Test Process",
+        "id": "PROC-001"
+    }
     
-def test_start_migration_mapping_failure(migration_service, sample_data, tmp_path):
-    """Testa falha no mapeamento durante migração."""
-    # Mock do backup service
-    backup_file = tmp_path / "backup.json"
-    backup_file.touch()
-    migration_service.backup_service.create_backup = Mock(return_value=backup_file)
+    result = migration_service.migrate_identification_form(old_data)
     
-    # Mock do mapeamento com falha
-    migration_service._map_data = Mock(return_value=None)
-    
-    result = migration_service.start_migration("identification", sample_data)
-    
-    assert result is False
-    migration_service.backup_service.create_backup.assert_called_once()
-    migration_service._map_data.assert_called_once()
+    assert result["success"] is False
+    assert "Mapping failed" in str(result["errors"])
 
-def test_start_migration_validation_failure(migration_service, sample_data, tmp_path):
-    """Testa falha na validação durante migração."""
-    # Mock do backup service
-    backup_file = tmp_path / "backup.json"
-    backup_file.touch()
-    migration_service.backup_service.create_backup = Mock(return_value=backup_file)
+def test_start_migration_validation_failure(migration_service):
+    """Testa falha na validação dos dados."""
+    old_data = {
+        "name": "",  # Nome vazio (inválido)
+        "id": "invalid-id",  # ID com formato inválido
+        "status": "invalid"  # Status inválido
+    }
     
-    # Mock do mapeamento
-    migration_service._map_data = Mock(return_value={"migrated": True})
+    result = migration_service.migrate_identification_form(old_data)
     
-    # Mock da validação com falha
-    migration_service._validate_migration = Mock(return_value=False)
-    
-    result = migration_service.start_migration("identification", sample_data)
-    
-    assert result is False
-    migration_service.backup_service.create_backup.assert_called_once()
-    migration_service._map_data.assert_called_once()
-    migration_service._validate_migration.assert_called_once()
+    assert result["success"] is False
+    assert len(result["errors"]) > 0
 
-def test_rollback_migration_success(migration_service, sample_data, tmp_path):
+def test_rollback_migration_success(migration_service):
     """Testa rollback bem sucedido."""
-    backup_file = tmp_path / "backup.json"
-    backup_file.touch()
+    old_data = {
+        "name": "Test Process",
+        "id": "PROC-001",
+        "department": "IT",
+        "owner": "John Doe",
+        "status": "draft"
+    }
     
-    # Mock da restauração do backup
-    migration_service.backup_service.restore_backup = Mock(return_value=sample_data)
+    migration_service.save_error = True
+    result = migration_service.migrate_identification_form(old_data)
     
-    result = migration_service.rollback_migration("identification", backup_file)
-    
-    assert result is True
-    migration_service.backup_service.restore_backup.assert_called_once()
-    assert not migration_service.feature_flags.is_enabled(MigrationFlag.IDENTIFICATION_MIGRATED)
+    assert result["success"] is False
+    assert result["rollback"]["success"] is True
 
-def test_rollback_migration_failure(migration_service, tmp_path):
+def test_rollback_migration_failure(migration_service, monkeypatch):
     """Testa falha no rollback."""
-    backup_file = tmp_path / "backup.json"
-    backup_file.touch()
+    def mock_rollback_error(*args, **kwargs):
+        raise Exception("Rollback failed")
     
-    # Mock da restauração do backup com falha
-    migration_service.backup_service.restore_backup = Mock(return_value=None)
+    monkeypatch.setattr(MigrationService, "_rollback_identification_form", mock_rollback_error)
     
-    result = migration_service.rollback_migration("identification", backup_file)
+    old_data = {
+        "name": "Test Process",
+        "id": "PROC-001",
+        "department": "IT",
+        "owner": "John Doe",
+        "status": "draft"
+    }
     
-    assert result is False
-    migration_service.backup_service.restore_backup.assert_called_once()
+    migration_service.save_error = True
+    result = migration_service.migrate_identification_form(old_data)
+    
+    assert result["success"] is False
+    assert "Rollback failed" in str(result["errors"])
 
 def test_get_migration_status(migration_service):
     """Testa obtenção do status da migração."""
-    # Ativa alguns flags
-    migration_service.feature_flags.enable(MigrationFlag.IDENTIFICATION_MIGRATED)
-    migration_service.feature_flags.enable(MigrationFlag.PROCESS_DETAILS_MIGRATED)
+    form_name = "identification"
+    old_data = {
+        "name": "Test Process",
+        "id": "PROC-001"
+    }
     
-    status = migration_service.get_migration_status()
+    # Inicia migração
+    migration_service.migrate_identification_form(old_data)
     
-    assert status[MigrationFlag.IDENTIFICATION_MIGRATED.value] is True
-    assert status[MigrationFlag.PROCESS_DETAILS_MIGRATED.value] is True
-    assert status[MigrationFlag.BUSINESS_RULES_MIGRATED.value] is False
+    # Verifica status
+    status = migration_service.get_migration_status(form_name)
+    assert isinstance(status, dict)
+    assert "status" in status
+    assert "details" in status
 
-def test_invalid_form_name(migration_service, sample_data):
-    """Testa migração com nome de formulário inválido."""
-    result = migration_service.start_migration("invalid_form", sample_data)
-    assert result is False 
+def test_invalid_form_name(migration_service):
+    """Testa tentativa de migração com nome de formulário inválido."""
+    form_name = "invalid_form"
+    old_data = {"name": "Test"}
+    
+    with pytest.raises(ValueError, match="Invalid form name"):
+        migration_service.get_migration_status(form_name) 

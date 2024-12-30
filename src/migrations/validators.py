@@ -124,23 +124,38 @@ class DataValidator:
         for i, input_data in enumerate(data.get("data_inputs", [])):
             if not input_data.get("input_id"):
                 errors[f"data_inputs[{i}].input_id"] = "Input ID is required"
-            if not input_data.get("input_name"):
-                errors[f"data_inputs[{i}].input_name"] = "Input name is required"
+            if not input_data.get("name"):
+                errors[f"data_inputs[{i}].name"] = "Input name is required"
+            if not input_data.get("type"):
+                errors[f"data_inputs[{i}].type"] = "Input type is required"
             
             # Valida campos
-            for j, field in enumerate(input_data.get("field_definitions", [])):
-                if not field.get("field_name"):
-                    errors[f"data_inputs[{i}].field_definitions[{j}].field_name"] = "Field name is required"
-                if data_type := field.get("data_type"):
-                    if data_type not in self.valid_data_types:
-                        errors[f"data_inputs[{i}].field_definitions[{j}].data_type"] = f"Invalid data type"
+            for j, field in enumerate(input_data.get("fields", [])):
+                if not field.get("name"):
+                    errors[f"data_inputs[{i}].fields[{j}].name"] = "Field name is required"
+                if field_type := field.get("type"):
+                    if field_type not in self.valid_data_types:
+                        errors[f"data_inputs[{i}].fields[{j}].type"] = f"Invalid data type"
         
         # Valida outputs
-        for i, output in enumerate(data.get("data_outputs", [])):
-            if not output.get("output_id"):
+        for i, output_data in enumerate(data.get("data_outputs", [])):
+            if not output_data.get("output_id"):
                 errors[f"data_outputs[{i}].output_id"] = "Output ID is required"
-            if not output.get("output_name"):
-                errors[f"data_outputs[{i}].output_name"] = "Output name is required"
+            if not output_data.get("name"):
+                errors[f"data_outputs[{i}].name"] = "Output name is required"
+            if not output_data.get("destination"):
+                errors[f"data_outputs[{i}].destination"] = "Destination system is required"
+        
+        # Valida transformações
+        for i, transform in enumerate(data.get("transformations", [])):
+            if not transform.get("id"):
+                errors[f"transformations[{i}].id"] = "Transformation ID is required"
+            if not transform.get("name"):
+                errors[f"transformations[{i}].name"] = "Transformation name is required"
+            if not transform.get("input_fields"):
+                errors[f"transformations[{i}].input_fields"] = "Input fields are required"
+            if not transform.get("output_fields"):
+                errors[f"transformations[{i}].output_fields"] = "Output fields are required"
         
         return len(errors) == 0, errors
     
@@ -208,17 +223,21 @@ class DataValidator:
         errors = {}
         
         # Valida sistemas
+        if not data.get("systems"):
+            errors["systems"] = "At least one system is required"
+        
         for i, system in enumerate(data.get("systems", [])):
-            # Campos obrigatórios
             if not system.get("system_id"):
                 errors[f"systems[{i}].system_id"] = "System ID is required"
             if not system.get("system_name"):
                 errors[f"systems[{i}].system_name"] = "System name is required"
+            if not system.get("system_type"):
+                errors[f"systems[{i}].system_type"] = "System type is required"
             
-            # Valida detalhes de acesso
+            # Valida acesso
             access = system.get("access_details", {})
-            if access.get("permissions") and not isinstance(access["permissions"], list):
-                errors[f"systems[{i}].access_details.permissions"] = "Permissions must be a list"
+            if not access.get("access_type"):
+                errors[f"systems[{i}].access_details.access_type"] = "Access type is required"
         
         # Valida integrações
         for i, integration in enumerate(data.get("integrations", [])):
@@ -226,39 +245,8 @@ class DataValidator:
                 errors[f"integrations[{i}].source_system"] = "Source system is required"
             if not integration.get("target_system"):
                 errors[f"integrations[{i}].target_system"] = "Target system is required"
-            
-            # Valida frequência
-            if freq := integration.get("sync_frequency"):
-                if freq not in self.valid_frequencies:
-                    errors[f"integrations[{i}].sync_frequency"] = f"Invalid frequency"
-        
-        return len(errors) == 0, errors
-    
-    def validate_data_form_data(self, data: Dict[str, Any]) -> Tuple[bool, Dict[str, str]]:
-        """Valida dados do DataForm."""
-        errors = {}
-        
-        # Valida inputs
-        for i, input_data in enumerate(data.get("data_inputs", [])):
-            if not input_data.get("input_id"):
-                errors[f"data_inputs[{i}].input_id"] = "Input ID is required"
-            if not input_data.get("input_name"):
-                errors[f"data_inputs[{i}].input_name"] = "Input name is required"
-            
-            # Valida campos
-            for j, field in enumerate(input_data.get("field_definitions", [])):
-                if not field.get("field_name"):
-                    errors[f"data_inputs[{i}].field_definitions[{j}].field_name"] = "Field name is required"
-                if data_type := field.get("data_type"):
-                    if data_type not in self.valid_data_types:
-                        errors[f"data_inputs[{i}].field_definitions[{j}].data_type"] = f"Invalid data type"
-        
-        # Valida outputs
-        for i, output in enumerate(data.get("data_outputs", [])):
-            if not output.get("output_id"):
-                errors[f"data_outputs[{i}].output_id"] = "Output ID is required"
-            if not output.get("output_name"):
-                errors[f"data_outputs[{i}].output_name"] = "Output name is required"
+            if not integration.get("integration_type"):
+                errors[f"integrations[{i}].integration_type"] = "Integration type is required"
         
         return len(errors) == 0, errors
     
@@ -267,25 +255,26 @@ class DataValidator:
         errors = {}
         
         # Valida passos do processo
+        if not data.get("process_steps"):
+            errors["process_steps"] = "At least one process step is required"
+        
         for i, step in enumerate(data.get("process_steps", [])):
-            # Campos obrigatórios
             if not step.get("step_id"):
                 errors[f"process_steps[{i}].step_id"] = "Step ID is required"
             if not step.get("step_name"):
                 errors[f"process_steps[{i}].step_name"] = "Step name is required"
             if not step.get("description"):
                 errors[f"process_steps[{i}].description"] = "Step description is required"
-            
-            # Valida tipo do passo
             if step_type := step.get("step_type"):
-                if step_type not in self.valid_process_types:
-                    errors[f"process_steps[{i}].step_type"] = f"Invalid step type"
+                if step_type not in ["manual", "automated", "hybrid"]:
+                    errors[f"process_steps[{i}].step_type"] = "Invalid step type"
             
-            # Valida listas
-            for field in ["step_inputs", "step_outputs", "required_systems"]:
-                if value := step.get(field):
-                    if not isinstance(value, list):
-                        errors[f"process_steps[{i}].{field}"] = "Must be a list"
+            # Valida dependências
+            deps = step.get("dependencies", {})
+            if not isinstance(deps.get("previous_steps", []), list):
+                errors[f"process_steps[{i}].dependencies.previous_steps"] = "Previous steps must be a list"
+            if not isinstance(deps.get("next_steps", []), list):
+                errors[f"process_steps[{i}].dependencies.next_steps"] = "Next steps must be a list"
         
         # Valida fluxo do processo
         flow = data.get("process_flow", {})
@@ -293,17 +282,6 @@ class DataValidator:
             errors["process_flow.initial_step"] = "Initial step is required"
         if not flow.get("final_step"):
             errors["process_flow.final_step"] = "Final step is required"
-        
-        # Valida papéis
-        for i, role in enumerate(data.get("process_roles", [])):
-            if not role.get("role_name"):
-                errors[f"process_roles[{i}].role_name"] = "Role name is required"
-            
-            # Valida listas
-            for field in ["role_responsibilities", "required_skills"]:
-                if value := role.get(field):
-                    if not isinstance(value, list):
-                        errors[f"process_roles[{i}].{field}"] = "Must be a list"
         
         return len(errors) == 0, errors
     

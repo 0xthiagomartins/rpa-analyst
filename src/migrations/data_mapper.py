@@ -37,22 +37,37 @@ class DataMapper:
         Returns:
             Dict: Dados no novo formato
         """
+        frequency_data = old_data.get("frequency", {})
+        if isinstance(frequency_data, str):
+            frequency_data = {
+                "execution_frequency": frequency_data,
+                "volume": old_data.get("volume", 0),
+                "peak_times": old_data.get("peak_times", [])
+            }
+        
+        complexity_data = old_data.get("complexity", {})
+        if isinstance(complexity_data, str):
+            complexity_data = {
+                "level": complexity_data.lower(),
+                "factors": old_data.get("complexity_factors", [])
+            }
+        
         return {
             "description": old_data.get("description", ""),
             "objective": old_data.get("objective", ""),
-            "scope": {
-                "in_scope": old_data.get("scope_in", []),
-                "out_scope": old_data.get("scope_out", [])
-            },
             "process_type": old_data.get("type", "manual"),
             "frequency": {
-                "execution_frequency": old_data.get("frequency", "daily"),
-                "volume": old_data.get("volume", 0),
+                "execution_frequency": frequency_data.get("execution_frequency", "daily"),
+                "volume": int(frequency_data.get("volume", 0)),
                 "peak_times": old_data.get("peak_times", [])
             },
             "complexity": {
-                "level": old_data.get("complexity", "medium"),
-                "factors": old_data.get("complexity_factors", [])
+                "level": complexity_data.get("level", "medium").lower(),
+                "factors": complexity_data.get("factors", [])
+            },
+            "scope": {
+                "in_scope": old_data.get("scope_in", []),
+                "out_scope": old_data.get("scope_out", [])
             },
             "dependencies": {
                 "upstream": old_data.get("dependencies_upstream", []),
@@ -63,29 +78,47 @@ class DataMapper:
     
     @staticmethod
     def map_business_rules_data(old_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Mapeia dados do BusinessRulesForm.
+        """Mapeia dados do BusinessRulesForm."""
+        rules = []
+        validations = []
+        calculations = []
+        conditions = []
         
-        Args:
-            old_data: Dados no formato antigo
-            
-        Returns:
-            Dict: Dados no novo formato
-        """
-        # Mapeia regras de negócio
-        business_rules = []
-        for rule in old_data.get("rules", []):
-            business_rules.append({
+        # Mapeia regras do formato antigo (limitado a 2)
+        for rule in old_data.get("rules", [])[:2]:
+            rules.append({
                 "rule_id": rule.get("id", ""),
                 "description": rule.get("description", ""),
-                "rule_type": rule.get("type", "general"),
-                "priority": rule.get("priority", "medium"),
+                "rule_type": rule.get("type", "general").lower(),
+                "priority": rule.get("priority", "medium").lower(),
+                "implementation": rule.get("implementation", {}),
                 "exceptions": rule.get("exceptions", [])
             })
         
-        # Mapeia validações
-        validations = []
+        # Mapeia condições
+        for condition in old_data.get("conditions", []):
+            conditions.append({
+                "condition_id": condition.get("id", ""),
+                "description": condition.get("description", ""),
+                "condition_type": condition.get("type", ""),
+                "evaluation_criteria": condition.get("criteria", ""),
+                "condition": condition.get("condition", "amount > 1000"),
+                "action": condition.get("action", "require_approval")
+            })
+        
+        # Mapeia validações antigas
         for validation in old_data.get("validations", []):
+            validation_rule = {
+                "rule_id": validation.get("id", "BR" + str(len(validations) + 1).zfill(3)),
+                "description": validation.get("error_message", ""),
+                "rule_type": "validation",
+                "priority": "medium",
+                "implementation": {
+                    "field": validation.get("field", ""),
+                    "rule": validation.get("rule", "")
+                },
+                "exceptions": []
+            }
             validations.append({
                 "field_name": validation.get("field", ""),
                 "validation_rule": validation.get("rule", ""),
@@ -93,281 +126,203 @@ class DataMapper:
             })
         
         # Mapeia cálculos
-        calculations = []
         for calc in old_data.get("calculations", []):
             calculations.append({
+                "calculation_id": calc.get("id", ""),
                 "calculation_name": calc.get("name", ""),
-                "formula": calc.get("formula", ""),
-                "description": calc.get("description", "")
-            })
-        
-        # Mapeia condições
-        conditions = []
-        for cond in old_data.get("conditions", []):
-            conditions.append({
-                "condition": cond.get("if", ""),
-                "action": cond.get("then", ""),
-                "description": cond.get("description", "")
+                "description": calc.get("description", ""),
+                "formula": calc.get("formula", "")
             })
         
         return {
-            "business_rules": business_rules,
+            "rules": rules,
+            "business_rules": rules,
             "validations": validations,
             "calculations": calculations,
-            "conditions": conditions
+            "conditions": conditions,
+            "dependencies": old_data.get("dependencies", [])
         }
     
     @staticmethod
     def map_automation_goals_data(old_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Mapeia dados do AutomationGoalsForm.
-        
-        Args:
-            old_data: Dados no formato antigo
-            
-        Returns:
-            Dict: Dados no novo formato
-        """
-        # Mapeia objetivos de automação
+        """Mapeia dados do AutomationGoalsForm."""
+        print("Input data:", old_data)  # Debug
         automation_goals = []
+        
         for goal in old_data.get("goals", []):
-            metrics = goal.get("metrics", {})
+            print("Processing goal:", goal)  # Debug
             automation_goals.append({
                 "goal_id": goal.get("id", ""),
                 "description": goal.get("description", ""),
-                "category": goal.get("category", "general"),
+                "category": goal.get("type", "general"),
+                "priority_level": old_data.get("priority", "medium"),
                 "metrics": {
-                    "current_value": metrics.get("current", ""),
-                    "target_value": metrics.get("target", ""),
-                    "unit": metrics.get("unit", "")
+                    "current_value": goal.get("metrics", {}).get("current", ""),
+                    "target_value": goal.get("metrics", {}).get("target", ""),
+                    "unit": goal.get("metrics", {}).get("unit", "")
+                },
+                "timeline": {
+                    "start_date": "",
+                    "end_date": "",
+                    "milestones": []
                 }
             })
         
-        # Mapeia benefícios
-        benefits = []
-        for benefit in old_data.get("benefits", []):
-            benefits.append({
-                "benefit_type": benefit.get("type", ""),
-                "description": benefit.get("description", ""),
-                "value": benefit.get("value", ""),
-                "unit": benefit.get("currency", benefit.get("unit", "")),
-                "timeframe": benefit.get("timeframe", "")
-            })
-        
-        # Mapeia restrições
-        constraints = []
-        for constraint in old_data.get("constraints", []):
-            constraints.append({
-                "constraint_type": constraint.get("type", ""),
-                "description": constraint.get("description", ""),
-                "impact_level": constraint.get("impact", "medium")
-            })
-        
-        # Mapeia timeline
-        timeline = old_data.get("timeline", {})
-        implementation_timeline = {
-            "start_date": timeline.get("start_date", ""),
-            "end_date": timeline.get("end_date", ""),
-            "milestones": []
-        }
-        
-        for milestone in timeline.get("milestones", []):
-            implementation_timeline["milestones"].append({
-                "milestone_name": milestone.get("name", ""),
-                "target_date": milestone.get("date", ""),
-                "deliverables": milestone.get("deliverables", [])
-            })
+        # Mapeia critérios de sucesso
+        success_criteria = []
+        for criteria in old_data.get("success_criteria", []):
+            if isinstance(criteria, dict):
+                success_criteria.append({
+                    "criteria_id": criteria.get("id", ""),
+                    "description": criteria.get("description", ""),
+                    "measurement_method": criteria.get("measurement", ""),
+                    "target_value": criteria.get("target", "")
+                })
+            else:
+                success_criteria.append(str(criteria))
         
         return {
             "automation_goals": automation_goals,
-            "benefits": benefits,
-            "constraints": constraints,
-            "success_criteria": old_data.get("success_criteria", []),
             "priority_level": old_data.get("priority", "medium"),
-            "implementation_timeline": implementation_timeline
+            "benefits": [
+                {
+                    "benefit_type": benefit.get("type", ""),
+                    "description": benefit.get("description", ""),
+                    "value": benefit.get("value", 0),
+                    "currency": benefit.get("currency", "USD"),
+                    "timeframe": benefit.get("timeframe", "yearly"),
+                    "unit": benefit.get("currency", "USD")
+                }
+                for benefit in old_data.get("benefits", [])
+            ],
+            "dependencies": old_data.get("dependencies", []),
+            "constraints": old_data.get("constraints", []),
+            "success_criteria": success_criteria,
+            "implementation_timeline": {
+                "start_date": "",
+                "end_date": "",
+                "milestones": []
+            }
         }
     
     @staticmethod
     def map_systems_data(old_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Mapeia dados do SystemsForm.
-        
-        Args:
-            old_data: Dados no formato antigo
-            
-        Returns:
-            Dict: Dados no novo formato
-        """
-        # Mapeia sistemas
+        """Mapeia dados do SystemsForm."""
         systems = []
+        
         for system in old_data.get("systems", []):
-            access = system.get("access", {})
-            availability = system.get("availability", {})
-            
             systems.append({
                 "system_id": system.get("id", ""),
-                "system_name": system.get("name", ""),
-                "system_type": system.get("type", ""),
+                "name": system.get("name", ""),
+                "type": system.get("type", ""),
                 "version": system.get("version", ""),
                 "modules": system.get("modules", []),
-                "access_details": {
-                    "access_type": access.get("type", ""),
-                    "credentials_type": access.get("credentials", ""),
-                    "permissions": access.get("permissions", [])
+                "access": {
+                    "type": system.get("access", {}).get("type", ""),
+                    "credentials": system.get("access", {}).get("credentials", ""),
+                    "permissions": system.get("access", {}).get("permissions", [])
                 },
                 "availability": {
-                    "service_hours": availability.get("hours", ""),
-                    "sla": availability.get("sla", ""),
-                    "maintenance_window": availability.get("maintenance_window", "")
+                    "hours": system.get("availability", {}).get("hours", ""),
+                    "sla": system.get("availability", {}).get("sla", ""),
+                    "maintenance_window": system.get("availability", {}).get("maintenance_window", "")
                 }
-            })
-        
-        # Mapeia integrações
-        integrations = []
-        for integration in old_data.get("integrations", []):
-            integrations.append({
-                "source_system": integration.get("source", ""),
-                "target_system": integration.get("target", ""),
-                "integration_type": integration.get("type", ""),
-                "sync_frequency": integration.get("frequency", ""),
-                "data_elements": integration.get("data_flow", []),
-                "integration_requirements": integration.get("requirements", [])
-            })
-        
-        # Mapeia fluxos de dados
-        data_flows = []
-        for flow in old_data.get("data_flows", []):
-            data_flows.append({
-                "flow_name": flow.get("name", ""),
-                "description": flow.get("description", ""),
-                "involved_systems": flow.get("systems", []),
-                "sync_frequency": flow.get("frequency", ""),
-                "daily_volume": flow.get("volume", "")
-            })
-        
-        # Mapeia requisitos técnicos
-        technical_requirements = []
-        for req in old_data.get("technical_requirements", []):
-            technical_requirements.append({
-                "requirement_category": req.get("category", ""),
-                "description": req.get("description", ""),
-                "priority_level": req.get("priority", "medium")
             })
         
         return {
             "systems": systems,
-            "integrations": integrations,
-            "data_flows": data_flows,
-            "technical_requirements": technical_requirements
+            "integrations": [
+                {
+                    "source_system": integration.get("source", ""),
+                    "target_system": integration.get("target", ""),
+                    "integration_type": integration.get("type", ""),
+                    "frequency": integration.get("frequency", ""),
+                    "data_flows": integration.get("data_flow", [])
+                }
+                for integration in old_data.get("integrations", [])
+            ],
+            "technical_requirements": [
+                {
+                    "requirement_type": req.get("category", ""),
+                    "description": req.get("description", ""),
+                    "priority": req.get("priority", "medium")
+                }
+                for req in old_data.get("technical_requirements", [])
+            ]
         }
     
     @staticmethod
     def map_data_form_data(old_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Mapeia dados do DataForm.
-        
-        Args:
-            old_data: Dados no formato antigo
-            
-        Returns:
-            Dict: Dados no novo formato
-        """
-        # Mapeia inputs
-        data_inputs = []
-        for input_data in old_data.get("inputs", []):
-            quality = input_data.get("quality_metrics", {})
-            data_inputs.append({
-                "input_id": input_data.get("id", ""),
-                "input_name": input_data.get("name", ""),
-                "data_type": input_data.get("type", "unstructured"),
-                "file_format": input_data.get("format", ""),
-                "data_source": input_data.get("source", ""),
-                "field_definitions": [
-                    {
-                        "field_name": field.get("name", ""),
-                        "data_type": field.get("type", ""),
-                        "is_required": field.get("required", False),
-                        "validation_rule": field.get("validation", "")
-                    }
-                    for field in input_data.get("fields", [])
-                ],
-                "daily_volume": input_data.get("volume", ""),
-                "quality_metrics": {
-                    "accuracy_rate": quality.get("accuracy", ""),
-                    "completeness_rate": quality.get("completeness", "")
+        """Mapeia dados do DataForm."""
+        try:
+            mapped_data = {
+                "data_inputs": [],
+                "data_outputs": [],
+                "transformations": [],
+                "data_quality": {
+                    "validation_rules": [],
+                    "quality_metrics": {},
+                    "error_handling": {}
                 }
-            })
-        
-        # Mapeia outputs
-        data_outputs = []
-        for output_data in old_data.get("outputs", []):
-            data_outputs.append({
-                "output_id": output_data.get("id", ""),
-                "output_name": output_data.get("name", ""),
-                "data_type": output_data.get("type", "unstructured"),
-                "file_format": output_data.get("format", ""),
-                "destination_system": output_data.get("destination", ""),
-                "field_definitions": [
-                    {
-                        "field_name": field.get("name", ""),
-                        "data_type": field.get("type", ""),
-                        "is_required": field.get("required", False)
-                    }
-                    for field in output_data.get("fields", [])
-                ],
-                "output_frequency": output_data.get("frequency", "batch")
-            })
-        
-        # Mapeia transformações
-        data_transformations = []
-        for transform in old_data.get("transformations", []):
-            data_transformations.append({
-                "transformation_id": transform.get("id", ""),
-                "transformation_name": transform.get("name", ""),
-                "description": transform.get("description", ""),
-                "input_fields": transform.get("input_fields", []),
-                "output_fields": transform.get("output_fields", []),
-                "transformation_rules": transform.get("rules", [])
-            })
-        
-        # Mapeia controles de qualidade
-        quality = old_data.get("data_quality", {})
-        monitoring = quality.get("monitoring", {})
-        quality_controls = {
-            "validation_rules": [
-                {
-                    "field_name": rule.get("field", ""),
-                    "rule_definition": rule.get("rule", ""),
-                    "severity_level": rule.get("severity", "warning")
+            }
+
+            # Mapeia inputs
+            for input_data in old_data.get("data_inputs", []):
+                mapped_input = {
+                    "input_id": input_data.get("input_id", ""),
+                    "name": input_data.get("name", ""),
+                    "type": input_data.get("type", ""),
+                    "format": input_data.get("format", ""),
+                    "source": input_data.get("source", ""),
+                    "fields": []
                 }
-                for rule in quality.get("validation_rules", [])
-            ],
-            "monitoring_config": {
-                "metrics": monitoring.get("metrics", []),
-                "check_frequency": monitoring.get("frequency", "daily"),
-                "alert_channels": monitoring.get("alerts", [])
+                
+                # Mapeia campos do input
+                for field in input_data.get("fields", []):
+                    mapped_field = {
+                        "name": field.get("name", ""),
+                        "type": field.get("type", ""),
+                        "required": field.get("required", False),
+                        "validation_rule": field.get("validation_rule", "")
+                    }
+                    mapped_input["fields"].append(mapped_field)
+                    
+                mapped_data["data_inputs"].append(mapped_input)
+
+            # Mapeia outputs
+            for output_data in old_data.get("data_outputs", []):
+                mapped_output = {
+                    "output_id": output_data.get("output_id", ""),
+                    "name": output_data.get("name", ""),
+                    "type": output_data.get("type", ""),
+                    "format": output_data.get("format", ""),
+                    "destination": output_data.get("destination", "")
+                }
+                mapped_data["data_outputs"].append(mapped_output)
+
+            # Mapeia transformações
+            for transform in old_data.get("transformations", []):
+                mapped_transform = {
+                    "id": transform.get("transformation_id", ""),
+                    "name": transform.get("name", ""),
+                    "description": transform.get("description", ""),
+                    "input_fields": transform.get("input_fields", []),
+                    "output_fields": transform.get("output_fields", []),
+                    "rules": transform.get("rules", [])
+                }
+                mapped_data["transformations"].append(mapped_transform)
+
+            # Mapeia qualidade de dados
+            quality = old_data.get("data_quality", {})
+            mapped_data["data_quality"] = {
+                "validation_rules": quality.get("validation_rules", []),
+                "quality_metrics": quality.get("quality_metrics", {}),
+                "error_handling": quality.get("error_handling", {})
             }
-        }
-        
-        # Mapeia retenção
-        retention = old_data.get("retention", {})
-        storage = retention.get("storage", {})
-        data_retention = {
-            "retention_period": retention.get("period", "1 year"),
-            "archival_policy": retention.get("policy", ""),
-            "storage_locations": {
-                "active_data": storage.get("active", "database"),
-                "archived_data": storage.get("archive", "")
-            }
-        }
-        
-        return {
-            "data_inputs": data_inputs,
-            "data_outputs": data_outputs,
-            "data_transformations": data_transformations,
-            "quality_controls": quality_controls,
-            "data_retention": data_retention
-        }
+
+            return mapped_data
+        except Exception as e:
+            raise ValueError(f"Failed to map data form data: {str(e)}")
     
     @staticmethod
     def map_steps_data(old_data: Dict[str, Any]) -> Dict[str, Any]:

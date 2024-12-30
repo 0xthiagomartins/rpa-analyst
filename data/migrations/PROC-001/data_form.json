@@ -1,0 +1,58 @@
+{
+    "data_inputs": [
+        {
+            "input_id": "INP001",
+            "name": "Customer Data",
+            "type": "structured",
+            "format": "CSV",
+            "source": "CRM System",
+            "fields": [
+                {
+                    "name": "customer_id",
+                    "type": "string",
+                    "required": true,
+                    "validation_rule": "length > 0"
+                }
+            ]
+        }
+    ],
+    "data_outputs": [
+        {
+            "output_id": "OUT001",
+            "name": "Processed Orders",
+            "type": "structured",
+            "format": "JSON",
+            "destination": "Order System"
+        }
+    ],
+    "transformations": [
+        {
+            "id": "TR001",
+            "name": "Data Validation",
+            "description": "Validate customer data",
+            "input_fields": [
+                "customer_id"
+            ],
+            "output_fields": [
+                "validated_id"
+            ],
+            "rules": [
+                "validate_id_format"
+            ]
+        }
+    ],
+    "data_quality": {
+        "validation_rules": [
+            "completeness",
+            "accuracy"
+        ],
+        "quality_metrics": {
+            "accuracy_threshold": "98%",
+            "completeness_threshold": "95%"
+        },
+        "error_handling": {
+            "retry_attempts": 3,
+            "error_notification": "email"
+        }
+    }
+}

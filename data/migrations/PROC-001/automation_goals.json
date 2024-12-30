@@ -1,0 +1,41 @@
+{
+  "data": {
+    "automation_goals": [
+      {
+        "goal_id": "GOAL001",
+        "description": "Reduzir tempo de processamento",
+        "category": "efficiency",
+        "priority_level": "high",
+        "metrics": {
+          "current_value": "30 minutes",
+          "target_value": "5 minutes",
+          "unit": "time"
+        }
+      }
+    ],
+    "priority_level": "medium",
+    "benefits": [
+      {
+        "benefit_type": "",
+        "description": "Redu\u00e7\u00e3o de custos operacionais",
+        "value": "50000",
+        "currency": "USD",
+        "timeframe": "yearly",
+        "unit": "USD"
+      }
+    ],
+    "dependencies": [],
+    "constraints": [],
+    "success_criteria": [],
+    "implementation_timeline": {
+      "start_date": "",
+      "end_date": "",
+      "milestones": []
+    }
+  },
+  "metadata": {
+    "version": "1.0",
+    "migrated_at": "2024-12-30T17:34:21.550197",
+    "status": "migrated"
+  }
+}

@@ -1,0 +1,103 @@
+{
+    "process_steps": [
+        {
+            "step_id": "STEP001",
+            "step_name": "Receive Request",
+            "description": "Receive and validate customer request",
+            "step_type": "manual",
+            "assigned_role": "Analyst",
+            "time_estimate": "10 minutes",
+            "step_inputs": [
+                "Customer Form",
+                "ID Document"
+            ],
+            "step_outputs": [
+                "Validated Request"
+            ],
+            "required_systems": [
+                "CRM"
+            ],
+            "execution_instructions": [
+                "Check if form is complete",
+                "Validate customer ID"
+            ],
+            "validation_points": [
+                "All required fields filled",
+                "ID document is valid"
+            ],
+            "dependencies": {
+                "previous_steps": [],
+                "next_steps": [
+                    "STEP002"
+                ]
+            }
+        },
+        {
+            "step_id": "STEP002",
+            "step_name": "Process Request",
+            "description": "Process customer request in system",
+            "step_type": "automated",
+            "assigned_role": "System",
+            "time_estimate": "2 minutes",
+            "step_inputs": [
+                "Validated Request"
+            ],
+            "step_outputs": [
+                "Processed Request"
+            ],
+            "required_systems": [
+                "CRM",
+                "Processing System"
+            ],
+            "execution_instructions": [
+                "Submit request to processing queue",
+                "Update customer record"
+            ],
+            "validation_points": [
+                "Request successfully processed",
+                "Customer record updated"
+            ],
+            "dependencies": {
+                "previous_steps": [
+                    "STEP001"
+                ],
+                "next_steps": []
+            }
+        }
+    ],
+    "process_flow": {
+        "initial_step": "STEP001",
+        "final_step": "STEP002",
+        "parallel_execution": [],
+        "conditional_execution": []
+    },
+    "process_roles": [
+        {
+            "role_name": "Analyst",
+            "role_responsibilities": [
+                "Validate requests",
+                "Handle exceptions"
+            ],
+            "required_skills": [
+                "Data validation",
+                "System knowledge"
+            ]
+        },
+        {
+            "role_name": "System",
+            "role_responsibilities": [
+                "Process requests",
+                "Update records"
+            ],
+            "required_skills": [
+                "Automated processing"
+            ]
+        }
+    ],
+    "process_metrics": {
+        "total_processing_time": "",
+        "manual_processing_time": "",
+        "automated_processing_time": "",
+        "number_of_handoffs": 0
+    }
+}

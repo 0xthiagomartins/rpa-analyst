@@ -1,0 +1,33 @@
+{
+  "data": {
+    "description": "Processo de vendas completo",
+    "objective": "Automatizar processo de vendas",
+    "process_type": "automated",
+    "frequency": {
+      "execution_frequency": "daily",
+      "volume": 100,
+      "peak_times": []
+    },
+    "complexity": {
+      "level": "medium",
+      "factors": [
+        "Multiple systems",
+        "Business rules"
+      ]
+    },
+    "scope": {
+      "in_scope": [],
+      "out_scope": []
+    },
+    "dependencies": {
+      "upstream": [],
+      "downstream": []
+    },
+    "additional_info": ""
+  },
+  "metadata": {
+    "version": "1.0",
+    "migrated_at": "2024-12-30T17:34:21.535732",
+    "status": "migrated"
+  }
+}

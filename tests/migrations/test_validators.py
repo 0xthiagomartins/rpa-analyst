@@ -1,6 +1,7 @@
 """Testes para os validadores de dados."""
 import pytest
 from src.migrations.validators import DataValidator
+from pytest_check import check
 
 @pytest.fixture
 def sample_identification_data():
@@ -89,13 +90,14 @@ def sample_data_form_data():
         "data_inputs": [
             {
                 "input_id": "INP001",
-                "input_name": "Customer Data",
-                "data_type": "structured",
-                "field_definitions": [
+                "name": "Customer Data",
+                "type": "structured",
+                "fields": [
                     {
-                        "field_name": "customer_id",
-                        "data_type": "string",
-                        "is_required": True
+                        "name": "customer_id",
+                        "type": "string",
+                        "required": True,
+                        "validation": "length > 0"
                     }
                 ]
             }
@@ -103,8 +105,17 @@ def sample_data_form_data():
         "data_outputs": [
             {
                 "output_id": "OUT001",
-                "output_name": "Processed Data",
-                "data_type": "structured"
+                "name": "Processed Data",
+                "type": "structured",
+                "destination": "System X"
+            }
+        ],
+        "transformations": [
+            {
+                "id": "TR001",
+                "name": "Data Validation",
+                "input_fields": ["customer_id"],
+                "output_fields": ["validated_id"]
             }
         ]
     }
@@ -342,19 +353,27 @@ def test_validate_data_form_invalid_type():
         "data_inputs": [
             {
                 "input_id": "INP001",
-                "field_definitions": [
+                "name": "Test Input",
+                "type": "structured",
+                "fields": [
                     {
-                        "field_name": "field1",
-                        "data_type": "invalid_type"
+                        "name": "field1",
+                        "type": "invalid_type"
                     }
                 ]
             }
         ]
     }
+    
     validator = DataValidator()
     result, errors = validator.validate_data_form_data(data)
-    assert result is False
-    assert "data_inputs[0].field_definitions[0].data_type" in errors
+    
+    with check:
+        assert result is False, "Deveria falhar com tipo inválido"
+    with check:
+        assert "data_inputs[0].fields[0].type" in errors, "Erro deveria indicar tipo inválido"
+    with check:
+        assert "Invalid data type" in errors["data_inputs[0].fields[0].type"], "Mensagem incorreta"
 
 def test_validate_steps_data_success(sample_steps_data):
     """Testa validação bem sucedida do StepsForm."""
