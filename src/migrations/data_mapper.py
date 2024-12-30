@@ -1,5 +1,6 @@
 """Módulo para mapeamento de dados entre formatos."""
 from typing import Dict, Any, Optional
+import json
 
 class DataMapper:
     """Classe para mapear dados entre formatos antigo e novo."""
@@ -255,6 +256,8 @@ class DataMapper:
     def map_data_form_data(old_data: Dict[str, Any]) -> Dict[str, Any]:
         """Mapeia dados do DataForm."""
         try:
+            print("Input data:", json.dumps(old_data, indent=2))  # Debug log
+            
             mapped_data = {
                 "data_inputs": [],
                 "data_outputs": [],
@@ -268,6 +271,8 @@ class DataMapper:
 
             # Mapeia inputs
             for input_data in old_data.get("data_inputs", []):
+                print("Processing input:", json.dumps(input_data, indent=2))  # Debug log
+                
                 mapped_input = {
                     "input_id": input_data.get("input_id", ""),
                     "name": input_data.get("name", ""),
@@ -286,7 +291,8 @@ class DataMapper:
                         "validation_rule": field.get("validation_rule", "")
                     }
                     mapped_input["fields"].append(mapped_field)
-                    
+                
+                print("Mapped input:", json.dumps(mapped_input, indent=2))  # Debug log
                 mapped_data["data_inputs"].append(mapped_input)
 
             # Mapeia outputs
@@ -320,8 +326,11 @@ class DataMapper:
                 "error_handling": quality.get("error_handling", {})
             }
 
+            print("Final mapped data:", json.dumps(mapped_data, indent=2))  # Debug log
             return mapped_data
+            
         except Exception as e:
+            print(f"Error mapping data: {str(e)}")  # Debug log
             raise ValueError(f"Failed to map data form data: {str(e)}")
     
     @staticmethod

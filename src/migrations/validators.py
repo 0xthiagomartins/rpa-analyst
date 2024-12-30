@@ -321,3 +321,20 @@ class DataValidator:
                 errors[f"training_materials[{i}].file_type"] = "File type is required"
         
         return len(errors) == 0, errors 
+    
+    def validate_data_integrity(self, old_data: Dict[str, Any], new_data: Dict[str, Any]) -> bool:
+        """Valida integridade dos dados após migração."""
+        try:
+            # Verifica campos obrigatórios
+            for field in self.required_fields:
+                if field not in new_data:
+                    return False
+                
+            # Verifica tipos de dados
+            for field, field_type in self.field_types.items():
+                if field in new_data and not isinstance(new_data[field], field_type):
+                    return False
+                
+            return True
+        except Exception:
+            return False 

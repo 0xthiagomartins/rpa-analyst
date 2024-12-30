@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 import time
+import os
 
 from src.utils.migration_logger import MigrationLogger
 
@@ -126,3 +127,17 @@ class BackupService:
                 for backup in backups[max_backups:]:
                     backup.unlink()
                     self.logger.info(f"Removed old backup: {backup}") 
+    
+    def backup_form_data(self, form_type: str, process_id: str, data: Dict[str, Any]) -> bool:
+        """Faz backup dos dados do formulário antes da migração."""
+        try:
+            backup_path = f"backups/{process_id}/{form_type}_{datetime.now().isoformat()}.json"
+            os.makedirs(os.path.dirname(backup_path), exist_ok=True)
+            
+            with open(backup_path, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to backup {form_type} data: {str(e)}")
+            return False 
