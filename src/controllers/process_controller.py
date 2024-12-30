@@ -1,39 +1,46 @@
-from typing import Optional
-from src.models.process import Process
+"""Controller para gerenciamento de processos."""
+from typing import Dict, Any, Optional
 from src.managers.process_manager import ProcessManager
-import logging
-
-# Criar logger local
-logger = logging.getLogger(__name__)
+from src.services.ai_service import AIService
+from src.utils.dependency_container import DependencyContainer
 
 class ProcessController:
-    """Controlador para gerenciar processos RPA."""
+    """Controller para operações relacionadas a processos."""
     
-    def __init__(self):
-        self.process_manager = ProcessManager()
-        self._restore_state()
+    def __init__(self, container: Optional[DependencyContainer] = None):
+        """Inicializa o controller."""
+        self.container = container or DependencyContainer()
+        self.process_manager = self.container.resolve(ProcessManager)
+        self.ai_service = self.container.resolve(AIService)
     
-    def _restore_state(self):
-        """Restaura o estado do controlador."""
+    def create_process(self, data: Dict[str, Any]) -> bool:
+        """Cria um novo processo."""
         try:
-            current_process = self.get_current_process()
-            if current_process:
-                logger.debug(f"Estado restaurado: Processo atual = {current_process.name}")
+            return self.process_manager.create_process(data)
         except Exception as e:
-            logger.error(f"Erro ao restaurar estado: {e}")
+            print(f"Erro ao criar processo: {str(e)}")
+            return False
     
-    def create_process(self, process_data: dict) -> Process:
-        """Cria um novo processo a partir dos dados fornecidos."""
-        return self.process_manager.create_process(process_data)
+    def update_process(self, process_id: str, data: Dict[str, Any]) -> bool:
+        """Atualiza um processo existente."""
+        try:
+            return self.process_manager.update_process(process_id, data)
+        except Exception as e:
+            print(f"Erro ao atualizar processo: {str(e)}")
+            return False
     
-    def update_process(self, process_data: dict) -> Process:
-        """Atualiza os dados do processo atual."""
-        current = self.get_current_process()
-        if not current:
-            return self.create_process(process_data)
-        
-        return self.process_manager.update_process(current.name, process_data)
+    def get_process(self, process_id: str) -> Optional[Dict[str, Any]]:
+        """Obtém os dados de um processo."""
+        try:
+            return self.process_manager.get_process(process_id)
+        except Exception as e:
+            print(f"Erro ao obter processo: {str(e)}")
+            return None
     
-    def get_current_process(self) -> Optional[Process]:
-        """Retorna o processo atual."""
-        return self.process_manager.get_current_process() 
+    def delete_process(self, process_id: str) -> bool:
+        """Remove um processo."""
+        try:
+            return self.process_manager.delete_process(process_id)
+        except Exception as e:
+            print(f"Erro ao deletar processo: {str(e)}")
+            return False 

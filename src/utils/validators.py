@@ -83,26 +83,36 @@ def validate_process_description(description: str) -> bool:
 
 def validate_diagram(diagram: str) -> bool:
     """Valida a sintaxe do diagrama Mermaid."""
-    if not diagram or not diagram.strip():
+    if not diagram or not isinstance(diagram, str):
         return False
+        
+    # Remove espaços em branco extras e quebras de linha
+    diagram = diagram.strip()
     
+    # Validações básicas de sintaxe
     required_elements = [
-        'graph',
-        '[',
-        ']',
-        '-->'
+        'graph',  # Deve ter a declaração do tipo de gráfico
+        '[',      # Deve ter pelo menos um nó
+        ']',      # Fechamento do nó
+        '-->'     # Deve ter pelo menos uma conexão
     ]
     
     for element in required_elements:
         if element not in diagram:
             return False
-    
+            
+    # Verifica se há nós sem conexão ou conexões incompletas
     lines = [line.strip() for line in diagram.split('\n') if line.strip()]
     for line in lines:
+        if '-->' in line:
+            parts = line.split('-->')
+            if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
+                return False
+                
         if '[' in line and ']' in line and '-->' not in line:
             if not any(line in other_line for other_line in lines if '-->' in other_line):
                 return False
-    
+                
     return True
 
 def validate_required_fields(data: Dict[str, Any], required: List[str]) -> bool:
