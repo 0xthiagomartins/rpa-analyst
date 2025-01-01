@@ -1,11 +1,14 @@
-import os, sys
+"""Módulo de inicialização da aplicação."""
+import os
+import sys
+from pathlib import Path
 
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, parent_dir)
-src_dir = os.path.join(parent_dir, "src")
-sys.path.insert(0, src_dir)
+# Adiciona o diretório raiz ao PYTHONPATH
+root_dir = Path(__file__).parent.parent
+sys.path.append(str(root_dir))
 
-from src.app import main
+# Importa a função main
+from app import main
 
 if __name__ == "__main__":
     main()

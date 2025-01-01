@@ -1,1 +1,1 @@
-from .components import * 
+"""Pacote de views da aplicação.""" 

@@ -6,3 +6,8 @@ output/*
 logs/*
 backups/*
 data/migrations/PROC-001/*
+# Output files
+output/
+*.pdf
+*.json
+*.mmd
