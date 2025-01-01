@@ -1,325 +1,318 @@
 """Formulário de passos do processo."""
-from typing import Optional, Dict, Any, List
+from typing import Optional, List, Dict
 import streamlit as st
 from utils.container_interface import ContainerInterface
-from views.components.state.state_manager import StateManager, FormState
+from views.components.forms.form_base import BaseForm
+from views.components.forms.form_field import FormField
 
-class StepsForm:
-    """Formulário de passos do processo."""
+class StepsForm(BaseForm):
+    """Formulário para passos do processo."""
     
     def __init__(self, container: Optional[ContainerInterface] = None):
-        """
-        Inicializa o formulário.
+        """Inicializa o formulário."""
+        super().__init__("steps", container)
         
-        Args:
-            container: Container de dependências opcional
-        """
-        self.container = container
-        self.state_manager = StateManager()
-        self.form_id = "steps"
+        # Inicializa campos
+        self.steps_field = FormField(self.form_id, "steps")
+        self.decisions_field = FormField(self.form_id, "decisions")
+        self.loops_field = FormField(self.form_id, "loops")
         
-        # Carrega dados existentes
-        self.form_data = self.state_manager.get_form_data(self.form_id)
-        
-        # Inicializa lista de passos se necessário
+        # Inicializa listas se não existirem
         if "steps_list" not in st.session_state:
             st.session_state.steps_list = self.form_data.data.get("steps", [])
+        if "decisions_list" not in st.session_state:
+            st.session_state.decisions_list = self.form_data.data.get("decisions", [])
+        if "loops_list" not in st.session_state:
+            st.session_state.loops_list = self.form_data.data.get("loops", [])
     
     def validate(self) -> bool:
-        """
-        Valida os dados do formulário.
+        """Valida os dados do formulário."""
+        is_valid = True
+        errors = []
         
-        Returns:
-            bool: True se válido, False caso contrário
-        """
-        data = self.get_data()
-        steps = data.get("steps", [])
+        # Só valida se a flag de validação estiver ativa
+        if not st.session_state[f"{self.form_id}_show_validation"]:
+            return True
         
-        if not steps:
-            st.error("Adicione pelo menos um passo")
-            return False
+        # Valida passos
+        if not st.session_state.steps_list:
+            errors.append("Pelo menos um passo é obrigatório")
+            is_valid = False
         
-        for step in steps:
-            if not step.get("description"):
-                st.error("Todos os passos precisam ter uma descrição")
-                return False
-            if not step.get("type"):
-                st.error("Todos os passos precisam ter um tipo")
-                return False
+        # Valida sequência dos passos
+        step_sequences = [step["sequence"] for step in st.session_state.steps_list]
+        if len(set(step_sequences)) != len(step_sequences):
+            errors.append("Existem passos com a mesma sequência")
+            is_valid = False
         
-        return True
-    
-    def get_data(self) -> Dict[str, Any]:
-        """
-        Obtém os dados do formulário.
+        # Valida decisões
+        for decision in st.session_state.decisions_list:
+            step = decision["step"]
+            if step not in step_sequences:
+                errors.append(f"Decisão referencia passo inexistente: {step}")
+                is_valid = False
         
-        Returns:
-            Dict[str, Any]: Dados do formulário
-        """
-        return {
-            "steps": st.session_state.steps_list,
-            "process_flow": st.session_state.get("process_flow", ""),
-            "decision_points": st.session_state.get("decision_points", ""),
-            "exceptions": st.session_state.get("exceptions", ""),
-            "validations": st.session_state.get("validations", "")
-        }
-    
-    def save(self) -> bool:
-        """
-        Salva os dados do formulário.
+        # Valida loops
+        for loop in st.session_state.loops_list:
+            start = loop["start_step"]
+            end = loop["end_step"]
+            if start not in step_sequences or end not in step_sequences:
+                errors.append(f"Loop referencia passo inexistente: {start} -> {end}")
+                is_valid = False
+            if start >= end:
+                errors.append(f"Loop inválido: início ({start}) deve ser menor que fim ({end})")
+                is_valid = False
         
-        Returns:
-            bool: True se salvo com sucesso, False caso contrário
-        """
-        data = self.get_data()
-        is_valid = self.validate()
-        
-        # Atualiza estado
-        self.state_manager.update_form_data(
-            self.form_id,
-            data=data,
-            is_valid=is_valid,
-            state=FormState.COMPLETED if is_valid else FormState.INVALID
-        )
+        # Mostra erros se houver
+        for error in errors:
+            st.error(error)
         
         return is_valid
     
-    def _add_step(
-        self, 
-        description: str, 
-        step_type: str, 
-        actor: str,
-        system: str,
-        inputs: str,
-        outputs: str
-    ) -> None:
-        """
-        Adiciona um novo passo à lista.
-        
-        Args:
-            description: Descrição do passo
-            step_type: Tipo do passo
-            actor: Responsável pelo passo
-            system: Sistema envolvido
-            inputs: Entradas necessárias
-            outputs: Saídas geradas
-        """
-        if not description:
-            st.error("Descrição do passo é obrigatória")
-            return
+    def _add_step(self) -> None:
+        """Adiciona um novo passo."""
+        col1, col2 = st.columns(2)
+        with col1:
+            sequence = st.number_input("Sequência", min_value=1, key="new_step_seq")
+        with col2:
+            actor = st.text_input("Responsável", key="new_step_actor")
             
-        if not step_type:
-            st.error("Tipo do passo é obrigatório")
-            return
-        
-        new_step = {
-            "description": description,
-            "type": step_type,
-            "actor": actor,
-            "system": system,
-            "inputs": inputs,
-            "outputs": outputs,
-            "order": len(st.session_state.steps_list) + 1
-        }
-        
-        st.session_state.steps_list.append(new_step)
-        st.session_state.new_step_description = ""
-        st.session_state.new_step_type = ""
-        st.session_state.new_step_actor = ""
-        st.session_state.new_step_system = ""
-        st.session_state.new_step_inputs = ""
-        st.session_state.new_step_outputs = ""
-    
-    def _remove_step(self, index: int) -> None:
-        """
-        Remove um passo da lista.
-        
-        Args:
-            index: Índice do passo a ser removido
-        """
-        st.session_state.steps_list.pop(index)
-        
-        # Reordena os passos restantes
-        for i, step in enumerate(st.session_state.steps_list, 1):
-            step["order"] = i
-    
-    def _move_step(self, index: int, direction: int) -> None:
-        """
-        Move um passo para cima ou para baixo.
-        
-        Args:
-            index: Índice do passo
-            direction: 1 para baixo, -1 para cima
-        """
-        new_index = index + direction
-        if 0 <= new_index < len(st.session_state.steps_list):
-            st.session_state.steps_list[index], st.session_state.steps_list[new_index] = \
-                st.session_state.steps_list[new_index], st.session_state.steps_list[index]
+        description = st.text_area(
+            "Descrição do Passo",
+            key="new_step_desc",
+            help="Descreva a ação a ser executada"
+        )
             
-            # Atualiza a ordem
-            st.session_state.steps_list[index]["order"] = index + 1
-            st.session_state.steps_list[new_index]["order"] = new_index + 1
+        if st.button("➕ Adicionar Passo"):
+            if sequence and actor and description:
+                new_step = {
+                    "sequence": sequence,
+                    "actor": actor,
+                    "description": description
+                }
+                st.session_state.steps_list.append(new_step)
+                # Ordena por sequência
+                st.session_state.steps_list.sort(key=lambda x: x["sequence"])
+                self.update_field("steps", st.session_state.steps_list)
+                st.rerun()
+            else:
+                st.error("Preencha todos os campos")
+    
+    def _add_decision(self) -> None:
+        """Adiciona um novo ponto de decisão."""
+        step = st.number_input("Passo", min_value=1, key="new_decision_step")
+        condition = st.text_area(
+            "Condição",
+            key="new_decision_condition",
+            help="Ex: Se valor > 1000"
+        )
+        true_path = st.text_area("Caminho Verdadeiro", key="new_decision_true")
+        false_path = st.text_area("Caminho Falso", key="new_decision_false")
+            
+        if st.button("➕ Adicionar Decisão"):
+            if step and condition and true_path and false_path:
+                new_decision = {
+                    "step": step,
+                    "condition": condition,
+                    "true_path": true_path,
+                    "false_path": false_path
+                }
+                st.session_state.decisions_list.append(new_decision)
+                self.update_field("decisions", st.session_state.decisions_list)
+                st.rerun()
+            else:
+                st.error("Preencha todos os campos")
+    
+    def _add_loop(self) -> None:
+        """Adiciona um novo loop."""
+        start_step = st.number_input("Passo Inicial", min_value=1, key="new_loop_start")
+        end_step = st.number_input("Passo Final", min_value=1, key="new_loop_end")
+        condition = st.text_area(
+            "Condição de Parada",
+            key="new_loop_condition",
+            help="Ex: Até processar todos os registros"
+        )
+            
+        if st.button("➕ Adicionar Loop"):
+            if start_step and end_step and condition:
+                new_loop = {
+                    "start_step": start_step,
+                    "end_step": end_step,
+                    "condition": condition
+                }
+                st.session_state.loops_list.append(new_loop)
+                self.update_field("loops", st.session_state.loops_list)
+                st.rerun()
+            else:
+                st.error("Preencha todos os campos")
     
     def render(self) -> None:
         """Renderiza o formulário."""
-        st.write("### 👣 Passos do Processo")
+        self.render_form_header("👣 Passos do Processo")
+        
+        # Seção de Passos
+        st.write("#### Passos")
+        
+        # Lista passos existentes
+        for i, step in enumerate(st.session_state.steps_list):
+            st.markdown("---")
+            col1, col2, col3, col4 = st.columns([1, 2, 2, 1])
+            with col1:
+                new_sequence = st.number_input(
+                    "Seq.",
+                    value=step["sequence"],
+                    min_value=1,
+                    key=f"step_seq_{i}",
+                    disabled=not self.is_editing
+                )
+            with col2:
+                new_actor = st.text_input(
+                    "Responsável",
+                    value=step["actor"],
+                    key=f"step_actor_{i}",
+                    disabled=not self.is_editing
+                )
+            with col3:
+                new_description = st.text_area(
+                    "Descrição",
+                    value=step["description"],
+                    key=f"step_desc_{i}",
+                    disabled=not self.is_editing
+                )
+            with col4:
+                if self.is_editing and st.button("🗑️", key=f"del_step_{i}"):
+                    st.session_state.steps_list.pop(i)
+                    self.update_field("steps", st.session_state.steps_list)
+                    st.rerun()
+            
+            if self.is_editing and (
+                new_sequence != step["sequence"] or
+                new_actor != step["actor"] or
+                new_description != step["description"]
+            ):
+                st.session_state.steps_list[i] = {
+                    "sequence": new_sequence,
+                    "actor": new_actor,
+                    "description": new_description
+                }
+                # Reordena por sequência
+                st.session_state.steps_list.sort(key=lambda x: x["sequence"])
+                self.update_field("steps", st.session_state.steps_list)
         
         # Adicionar novo passo
-        st.write("#### Adicionar Novo Passo")
+        if self.is_editing:
+            self._add_step()
         
-        # Descrição e tipo
-        col1, col2 = st.columns([3, 1])
+        # Seção de Decisões
+        st.write("#### Pontos de Decisão")
         
-        with col1:
-            description = st.text_area(
-                "Descrição do Passo",
-                key="new_step_description",
-                help="Descreva o que deve ser feito"
-            )
-        
-        with col2:
-            step_type = st.selectbox(
-                "Tipo",
-                options=[
-                    "Manual", "Automático", "Decisão",
-                    "Validação", "Integração", "Outro"
-                ],
-                key="new_step_type",
-                help="Tipo do passo"
-            )
-        
-        # Responsável e sistema
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            actor = st.text_input(
-                "Responsável",
-                key="new_step_actor",
-                help="Quem executa este passo"
-            )
-        
-        with col2:
-            system = st.text_input(
-                "Sistema",
-                key="new_step_system",
-                help="Sistema utilizado"
-            )
-        
-        # Entradas e saídas
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            inputs = st.text_area(
-                "Entradas",
-                key="new_step_inputs",
-                help="Dados/documentos necessários"
-            )
-        
-        with col2:
-            outputs = st.text_area(
-                "Saídas",
-                key="new_step_outputs",
-                help="Dados/documentos gerados"
-            )
-        
-        if st.button("➕ Adicionar Passo", use_container_width=True):
-            self._add_step(description, step_type, actor, system, inputs, outputs)
-            st.rerun()
-        
-        # Lista de passos
-        st.write("#### Passos Cadastrados")
-        for i, step in enumerate(st.session_state.steps_list):
-            with st.container():
-                # Cabeçalho do passo
-                col1, col2, col3 = st.columns([3, 1, 1])
-                
-                with col1:
-                    st.write(f"**Passo {step['order']}: {step['type']}**")
-                
-                with col2:
-                    if i > 0:
-                        if st.button("⬆️", key=f"up_{i}"):
-                            self._move_step(i, -1)
-                            st.rerun()
-                
-                with col3:
-                    if i < len(st.session_state.steps_list) - 1:
-                        if st.button("⬇️", key=f"down_{i}"):
-                            self._move_step(i, 1)
-                            st.rerun()
-                
-                # Detalhes do passo
-                st.write(step['description'])
-                st.write(f"🧑‍💼 Responsável: {step['actor']} | 💻 Sistema: {step['system']}")
-                
-                col1, col2 = st.columns([4, 1])
-                
-                with col1:
-                    if step.get('inputs'):
-                        st.write("📥 Entradas:", step['inputs'])
-                    if step.get('outputs'):
-                        st.write("📤 Saídas:", step['outputs'])
-                
-                with col2:
-                    if st.button("🗑️", key=f"del_step_{i}"):
-                        self._remove_step(i)
-                        st.rerun()
-                
-                st.divider()
-        
-        # Informações adicionais
-        st.write("#### Informações Adicionais")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.text_area(
-                "Fluxo do Processo",
-                key="process_flow",
-                value=self.form_data.data.get("process_flow", ""),
-                help="Descreva o fluxo entre os passos"
-            )
-            
-            st.text_area(
-                "Pontos de Decisão",
-                key="decision_points",
-                value=self.form_data.data.get("decision_points", ""),
-                help="Liste os pontos de decisão"
-            )
-        
-        with col2:
-            st.text_area(
-                "Exceções",
-                key="exceptions",
-                value=self.form_data.data.get("exceptions", ""),
-                help="Liste as exceções possíveis"
-            )
-            
-            st.text_area(
-                "Validações",
-                key="validations",
-                value=self.form_data.data.get("validations", ""),
-                help="Descreva as validações necessárias"
-            )
-        
-        # Botões de ação
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("💾 Salvar", use_container_width=True):
-                if self.save():
-                    st.success("Dados salvos com sucesso!")
+        # Lista decisões existentes
+        for i, decision in enumerate(st.session_state.decisions_list):
+            st.markdown("---")
+            col1, col2, col3 = st.columns([1, 3, 1])
+            with col1:
+                new_step = st.number_input(
+                    "Passo",
+                    value=decision["step"],
+                    min_value=1,
+                    key=f"decision_step_{i}",
+                    disabled=not self.is_editing
+                )
+            with col2:
+                new_condition = st.text_area(
+                    "Condição",
+                    value=decision["condition"],
+                    key=f"decision_condition_{i}",
+                    disabled=not self.is_editing
+                )
+            with col3:
+                if self.is_editing and st.button("🗑️", key=f"del_decision_{i}"):
+                    st.session_state.decisions_list.pop(i)
+                    self.update_field("decisions", st.session_state.decisions_list)
                     st.rerun()
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                new_true_path = st.text_area(
+                    "Se Verdadeiro",
+                    value=decision["true_path"],
+                    key=f"decision_true_{i}",
+                    disabled=not self.is_editing
+                )
+            with col2:
+                new_false_path = st.text_area(
+                    "Se Falso",
+                    value=decision["false_path"],
+                    key=f"decision_false_{i}",
+                    disabled=not self.is_editing
+                )
+            
+            if self.is_editing and (
+                new_step != decision["step"] or
+                new_condition != decision["condition"] or
+                new_true_path != decision["true_path"] or
+                new_false_path != decision["false_path"]
+            ):
+                st.session_state.decisions_list[i] = {
+                    "step": new_step,
+                    "condition": new_condition,
+                    "true_path": new_true_path,
+                    "false_path": new_false_path
+                }
+                self.update_field("decisions", st.session_state.decisions_list)
         
-        with col2:
-            if st.button("🔄 Limpar", use_container_width=True):
-                self.state_manager.clear_form(self.form_id)
-                st.session_state.steps_list = []
-                st.rerun()
+        # Adicionar nova decisão
+        if self.is_editing:
+            self._add_decision()
         
-        with col3:
-            if st.button("❌ Cancelar", use_container_width=True):
-                self.state_manager.clear_form(self.form_id)
-                st.session_state.steps_list = []
-                st.warning("Edição cancelada")
-                st.rerun() 
+        # Seção de Loops
+        st.write("#### Loops")
+        
+        # Lista loops existentes
+        for i, loop in enumerate(st.session_state.loops_list):
+            st.markdown("---")
+            col1, col2, col3, col4 = st.columns([1, 1, 2, 1])
+            with col1:
+                new_start = st.number_input(
+                    "Início",
+                    value=loop["start_step"],
+                    min_value=1,
+                    key=f"loop_start_{i}",
+                    disabled=not self.is_editing
+                )
+            with col2:
+                new_end = st.number_input(
+                    "Fim",
+                    value=loop["end_step"],
+                    min_value=1,
+                    key=f"loop_end_{i}",
+                    disabled=not self.is_editing
+                )
+            with col3:
+                new_condition = st.text_area(
+                    "Condição",
+                    value=loop["condition"],
+                    key=f"loop_condition_{i}",
+                    disabled=not self.is_editing
+                )
+            with col4:
+                if self.is_editing and st.button("🗑️", key=f"del_loop_{i}"):
+                    st.session_state.loops_list.pop(i)
+                    self.update_field("loops", st.session_state.loops_list)
+                    st.rerun()
+            
+            if self.is_editing and (
+                new_start != loop["start_step"] or
+                new_end != loop["end_step"] or
+                new_condition != loop["condition"]
+            ):
+                st.session_state.loops_list[i] = {
+                    "start_step": new_start,
+                    "end_step": new_end,
+                    "condition": new_condition
+                }
+                self.update_field("loops", st.session_state.loops_list)
+        
+        # Adicionar novo loop
+        if self.is_editing:
+            self._add_loop() 

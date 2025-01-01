@@ -11,7 +11,7 @@ from views.components.forms.identification_form import IdentificationForm
 from views.components.state.state_manager import StateManager
 from views.components.forms.process_details_form import ProcessDetailsForm
 from views.components.forms.business_rules_form import BusinessRulesForm
-from views.components.forms.automation_goals_form import AutomationGoalsForm
+from views.components.forms.goals_form import GoalsForm
 from views.components.forms.systems_form import SystemsForm
 from views.components.forms.data_form import DataForm
 from views.components.forms.steps_form import StepsForm
@@ -49,8 +49,8 @@ class MainPage(BasePage):
         elif current_form == "rules":
             form = BusinessRulesForm(self.container)
             form.render()
-        elif current_form == "automation":
-            form = AutomationGoalsForm(self.container)
+        elif current_form == "goals":
+            form = GoalsForm(self.container)
             form.render()
         elif current_form == "systems":
             form = SystemsForm(self.container)

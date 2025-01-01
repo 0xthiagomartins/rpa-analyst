@@ -1,239 +1,269 @@
-"""Formulário de sistemas envolvidos."""
-from typing import Optional, Dict, Any, List
+"""Formulário de sistemas e integrações."""
+from typing import Optional, List, Dict
 import streamlit as st
 from utils.container_interface import ContainerInterface
-from views.components.state.state_manager import StateManager, FormState
+from views.components.forms.form_base import BaseForm
+from views.components.forms.form_field import FormField
 
-class SystemsForm:
-    """Formulário de sistemas envolvidos."""
+class SystemsForm(BaseForm):
+    """Formulário para sistemas e integrações."""
     
     def __init__(self, container: Optional[ContainerInterface] = None):
-        """
-        Inicializa o formulário.
+        """Inicializa o formulário."""
+        super().__init__("systems", container)
         
-        Args:
-            container: Container de dependências opcional
-        """
-        self.container = container
-        self.state_manager = StateManager()
-        self.form_id = "systems"
+        # Inicializa campos
+        self.systems_field = FormField(self.form_id, "systems")
+        self.integrations_field = FormField(self.form_id, "integrations")
+        self.credentials_field = FormField(self.form_id, "credentials")
         
-        # Carrega dados existentes
-        self.form_data = self.state_manager.get_form_data(self.form_id)
-        
-        # Inicializa lista de sistemas se necessário
+        # Inicializa listas se não existirem
         if "systems_list" not in st.session_state:
             st.session_state.systems_list = self.form_data.data.get("systems", [])
+        if "integrations_list" not in st.session_state:
+            st.session_state.integrations_list = self.form_data.data.get("integrations", [])
+        if "credentials_list" not in st.session_state:
+            st.session_state.credentials_list = self.form_data.data.get("credentials", [])
     
     def validate(self) -> bool:
-        """
-        Valida os dados do formulário.
+        """Valida os dados do formulário."""
+        is_valid = True
+        errors = []
         
-        Returns:
-            bool: True se válido, False caso contrário
-        """
-        data = self.get_data()
-        systems = data.get("systems", [])
+        # Só valida se a flag de validação estiver ativa
+        if not st.session_state[f"{self.form_id}_show_validation"]:
+            return True
         
-        if not systems:
-            st.error("Adicione pelo menos um sistema")
-            return False
+        # Valida sistemas
+        if not st.session_state.systems_list:
+            errors.append("Pelo menos um sistema é obrigatório")
+            is_valid = False
         
-        for system in systems:
-            if not system.get("name"):
-                st.error("Todos os sistemas precisam ter um nome")
-                return False
-            if not system.get("role"):
-                st.error("Todos os sistemas precisam ter um papel definido")
-                return False
+        # Valida credenciais para cada sistema
+        systems_with_credentials = {cred["system"] for cred in st.session_state.credentials_list}
+        systems_without_credentials = [
+            sys["name"] for sys in st.session_state.systems_list 
+            if sys["name"] not in systems_with_credentials
+        ]
         
-        return True
-    
-    def get_data(self) -> Dict[str, Any]:
-        """
-        Obtém os dados do formulário.
+        if systems_without_credentials:
+            errors.append(
+                "Os seguintes sistemas não possuem credenciais cadastradas: " +
+                ", ".join(systems_without_credentials)
+            )
+            is_valid = False
         
-        Returns:
-            Dict[str, Any]: Dados do formulário
-        """
-        return {
-            "systems": st.session_state.systems_list,
-            "integrations": st.session_state.get("integrations", ""),
-            "credentials": st.session_state.get("credentials", ""),
-            "access_requirements": st.session_state.get("access_requirements", ""),
-            "technical_constraints": st.session_state.get("technical_constraints", "")
-        }
-    
-    def save(self) -> bool:
-        """
-        Salva os dados do formulário.
-        
-        Returns:
-            bool: True se salvo com sucesso, False caso contrário
-        """
-        data = self.get_data()
-        is_valid = self.validate()
-        
-        # Atualiza estado
-        self.state_manager.update_form_data(
-            self.form_id,
-            data=data,
-            is_valid=is_valid,
-            state=FormState.COMPLETED if is_valid else FormState.INVALID
-        )
+        # Mostra erros se houver
+        for error in errors:
+            st.error(error)
         
         return is_valid
     
-    def _add_system(self, name: str, role: str, type: str, version: str) -> None:
-        """
-        Adiciona um novo sistema à lista.
-        
-        Args:
-            name: Nome do sistema
-            role: Papel no processo
-            type: Tipo do sistema
-            version: Versão do sistema
-        """
-        if not name:
-            st.error("Nome do sistema é obrigatório")
-            return
+    def _add_system(self) -> None:
+        """Adiciona um novo sistema."""
+        col1, col2 = st.columns(2)
+        with col1:
+            name = st.text_input("Nome do Sistema", key="new_system_name")
+        with col2:
+            role = st.text_input("Função no Processo", key="new_system_role")
             
-        if not role:
-            st.error("Papel do sistema é obrigatório")
-            return
-        
-        new_system = {
-            "name": name,
-            "role": role,
-            "type": type,
-            "version": version
-        }
-        
-        st.session_state.systems_list.append(new_system)
-        st.session_state.new_system_name = ""
-        st.session_state.new_system_role = ""
-        st.session_state.new_system_type = ""
-        st.session_state.new_system_version = ""
+        if st.button("➕ Adicionar Sistema"):
+            if name and role:
+                new_system = {"name": name, "role": role}
+                st.session_state.systems_list.append(new_system)
+                self.update_field("systems", st.session_state.systems_list)
+                st.rerun()
+            else:
+                st.error("Preencha o nome e a função do sistema")
     
-    def _remove_system(self, index: int) -> None:
-        """
-        Remove um sistema da lista.
-        
-        Args:
-            index: Índice do sistema a ser removido
-        """
-        st.session_state.systems_list.pop(index)
+    def _add_integration(self) -> None:
+        """Adiciona uma nova integração."""
+        col1, col2 = st.columns(2)
+        with col1:
+            source = st.text_input("Sistema Origem", key="new_integration_source")
+        with col2:
+            target = st.text_input("Sistema Destino", key="new_integration_target")
+            
+        description = st.text_area("Descrição da Integração", key="new_integration_desc")
+            
+        if st.button("➕ Adicionar Integração"):
+            if source and target and description:
+                new_integration = {
+                    "source": source,
+                    "target": target,
+                    "description": description
+                }
+                st.session_state.integrations_list.append(new_integration)
+                self.update_field("integrations", st.session_state.integrations_list)
+                st.rerun()
+            else:
+                st.error("Preencha todos os campos da integração")
+    
+    def _add_credential(self) -> None:
+        """Adiciona uma nova credencial."""
+        col1, col2 = st.columns(2)
+        with col1:
+            system = st.text_input("Sistema", key="new_credential_system")
+        with col2:
+            access_type = st.selectbox(
+                "Tipo de Acesso",
+                options=["Usuário/Senha", "API Key", "Token", "Certificado", "Outro"],
+                key="new_credential_type"
+            )
+            
+        notes = st.text_area("Observações", key="new_credential_notes")
+            
+        if st.button("➕ Adicionar Credencial"):
+            if system and access_type:
+                new_credential = {
+                    "system": system,
+                    "access_type": access_type,
+                    "notes": notes
+                }
+                st.session_state.credentials_list.append(new_credential)
+                self.update_field("credentials", st.session_state.credentials_list)
+                st.rerun()
+            else:
+                st.error("Preencha o sistema e o tipo de acesso")
     
     def render(self) -> None:
         """Renderiza o formulário."""
-        st.write("### 💻 Sistemas Envolvidos")
+        self.render_form_header("💻 Sistemas e Integrações")
+        
+        # Seção de Sistemas
+        st.write("#### Sistemas")
+        
+        # Lista sistemas existentes
+        for i, system in enumerate(st.session_state.systems_list):
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                new_name = st.text_input(
+                    "Nome",
+                    value=system["name"],
+                    key=f"system_name_{i}",
+                    disabled=not self.is_editing
+                )
+            with col2:
+                new_role = st.text_input(
+                    "Função",
+                    value=system["role"],
+                    key=f"system_role_{i}",
+                    disabled=not self.is_editing
+                )
+            with col3:
+                if self.is_editing and st.button("🗑️", key=f"del_system_{i}"):
+                    st.session_state.systems_list.pop(i)
+                    self.update_field("systems", st.session_state.systems_list)
+                    st.rerun()
+            
+            if self.is_editing and (new_name != system["name"] or new_role != system["role"]):
+                st.session_state.systems_list[i] = {
+                    "name": new_name,
+                    "role": new_role
+                }
+                self.update_field("systems", st.session_state.systems_list)
         
         # Adicionar novo sistema
-        st.write("#### Adicionar Novo Sistema")
-        col1, col2 = st.columns(2)
+        if self.is_editing:
+            self._add_system()
         
-        with col1:
-            name = st.text_input(
-                "Nome do Sistema",
-                key="new_system_name",
-                help="Nome do sistema envolvido"
-            )
-            
-            role = st.text_area(
-                "Papel no Processo",
-                key="new_system_role",
-                help="Descreva o papel deste sistema no processo"
-            )
+        # Seção de Integrações
+        st.write("#### Integrações")
         
-        with col2:
-            type = st.selectbox(
-                "Tipo",
-                options=[
-                    "ERP", "CRM", "BPM", "ECM", "DMS",
-                    "Legado", "Web", "Desktop", "Mobile", "Outro"
-                ],
-                key="new_system_type",
-                help="Tipo do sistema"
-            )
-            
-            version = st.text_input(
-                "Versão",
-                key="new_system_version",
-                help="Versão do sistema"
-            )
-        
-        if st.button("➕ Adicionar Sistema", use_container_width=True):
-            self._add_system(name, role, type, version)
-            st.rerun()
-        
-        # Lista de sistemas
-        st.write("#### Sistemas Cadastrados")
-        for i, system in enumerate(st.session_state.systems_list):
-            with st.container():
-                col1, col2 = st.columns([4, 1])
-                
-                with col1:
-                    st.write(f"**{system['name']}** ({system['type']} {system['version']})")
-                    st.write(system['role'])
-                
-                with col2:
-                    if st.button("🗑️", key=f"del_system_{i}"):
-                        self._remove_system(i)
-                        st.rerun()
-                
-                st.divider()
-        
-        # Informações adicionais
-        st.text_area(
-            "Integrações",
-            key="integrations",
-            value=self.form_data.data.get("integrations", ""),
-            help="Descreva as integrações necessárias entre os sistemas"
-        )
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.text_area(
-                "Credenciais",
-                key="credentials",
-                value=self.form_data.data.get("credentials", ""),
-                help="Liste as credenciais necessárias"
-            )
-            
-            st.text_area(
-                "Requisitos de Acesso",
-                key="access_requirements",
-                value=self.form_data.data.get("access_requirements", ""),
-                help="Descreva os requisitos de acesso"
-            )
-        
-        with col2:
-            st.text_area(
-                "Restrições Técnicas",
-                key="technical_constraints",
-                value=self.form_data.data.get("technical_constraints", ""),
-                help="Liste as restrições técnicas"
-            )
-        
-        # Botões de ação
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("💾 Salvar", use_container_width=True):
-                if self.save():
-                    st.success("Dados salvos com sucesso!")
+        # Lista integrações existentes
+        for i, integration in enumerate(st.session_state.integrations_list):
+            st.markdown("---")
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                new_source = st.text_input(
+                    "Origem",
+                    value=integration["source"],
+                    key=f"integration_source_{i}",
+                    disabled=not self.is_editing
+                )
+            with col2:
+                new_target = st.text_input(
+                    "Destino",
+                    value=integration["target"],
+                    key=f"integration_target_{i}",
+                    disabled=not self.is_editing
+                )
+            with col3:
+                if self.is_editing and st.button("🗑️", key=f"del_integration_{i}"):
+                    st.session_state.integrations_list.pop(i)
+                    self.update_field("integrations", st.session_state.integrations_list)
                     st.rerun()
+            
+            new_description = st.text_area(
+                "Descrição",
+                value=integration["description"],
+                key=f"integration_desc_{i}",
+                disabled=not self.is_editing
+            )
+            
+            if self.is_editing and (
+                new_source != integration["source"] or 
+                new_target != integration["target"] or
+                new_description != integration["description"]
+            ):
+                st.session_state.integrations_list[i] = {
+                    "source": new_source,
+                    "target": new_target,
+                    "description": new_description
+                }
+                self.update_field("integrations", st.session_state.integrations_list)
         
-        with col2:
-            if st.button("🔄 Limpar", use_container_width=True):
-                self.state_manager.clear_form(self.form_id)
-                st.session_state.systems_list = []
-                st.rerun()
+        # Adicionar nova integração
+        if self.is_editing:
+            self._add_integration()
         
-        with col3:
-            if st.button("❌ Cancelar", use_container_width=True):
-                self.state_manager.clear_form(self.form_id)
-                st.session_state.systems_list = []
-                st.warning("Edição cancelada")
-                st.rerun() 
+        # Seção de Credenciais
+        st.write("#### Credenciais")
+        
+        # Lista credenciais existentes
+        for i, credential in enumerate(st.session_state.credentials_list):
+            st.markdown("---")
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                new_system = st.text_input(
+                    "Sistema",
+                    value=credential["system"],
+                    key=f"credential_system_{i}",
+                    disabled=not self.is_editing
+                )
+            with col2:
+                new_type = st.selectbox(
+                    "Tipo",
+                    options=["Usuário/Senha", "API Key", "Token", "Certificado", "Outro"],
+                    index=["Usuário/Senha", "API Key", "Token", "Certificado", "Outro"].index(credential["access_type"]),
+                    key=f"credential_type_{i}",
+                    disabled=not self.is_editing
+                )
+            with col3:
+                if self.is_editing and st.button("🗑️", key=f"del_credential_{i}"):
+                    st.session_state.credentials_list.pop(i)
+                    self.update_field("credentials", st.session_state.credentials_list)
+                    st.rerun()
+            
+            new_notes = st.text_area(
+                "Observações",
+                value=credential["notes"],
+                key=f"credential_notes_{i}",
+                disabled=not self.is_editing
+            )
+            
+            if self.is_editing and (
+                new_system != credential["system"] or 
+                new_type != credential["access_type"] or
+                new_notes != credential["notes"]
+            ):
+                st.session_state.credentials_list[i] = {
+                    "system": new_system,
+                    "access_type": new_type,
+                    "notes": new_notes
+                }
+                self.update_field("credentials", st.session_state.credentials_list)
+        
+        # Adicionar nova credencial
+        if self.is_editing:
+            self._add_credential() 

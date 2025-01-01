@@ -1,159 +1,125 @@
 """Formulário de detalhes do processo."""
-from typing import Optional, Dict, Any
+from typing import Optional
 import streamlit as st
 from utils.container_interface import ContainerInterface
-from views.components.state.state_manager import StateManager, FormState
+from views.components.forms.form_base import BaseForm
+from views.components.forms.form_field import FormField
 
-class ProcessDetailsForm:
-    """Formulário de detalhes do processo."""
+class ProcessDetailsForm(BaseForm):
+    """Formulário para detalhes do processo."""
     
     def __init__(self, container: Optional[ContainerInterface] = None):
-        """
-        Inicializa o formulário.
+        """Inicializa o formulário."""
+        super().__init__("details", container)
         
-        Args:
-            container: Container de dependências opcional
-        """
-        self.container = container
-        self.state_manager = StateManager()
-        self.form_id = "details"
-        
-        # Carrega dados existentes
-        self.form_data = self.state_manager.get_form_data(self.form_id)
+        # Inicializa campos
+        self.steps_field = FormField(self.form_id, "steps_as_is")
+        self.systems_field = FormField(self.form_id, "systems")
+        self.data_field = FormField(self.form_id, "data_used")
+        self.volume_field = FormField(self.form_id, "volume")
+        self.frequency_field = FormField(self.form_id, "frequency")
+        self.additional_info_field = FormField(self.form_id, "additional_info")
     
     def validate(self) -> bool:
-        """
-        Valida os dados do formulário.
+        """Valida os dados do formulário."""
+        is_valid = True
+        errors = []
         
-        Returns:
-            bool: True se válido, False caso contrário
-        """
-        data = self.get_data()
+        # Só valida se a flag de validação estiver ativa
+        if not st.session_state[f"{self.form_id}_show_validation"]:
+            return True
         
-        # Validações básicas
-        if not data.get("current_process"):
-            st.error("Descrição do processo atual é obrigatória")
-            return False
-            
-        if not data.get("pain_points"):
-            st.error("Pontos de dor são obrigatórios")
-            return False
-            
-        if not data.get("expected_benefits"):
-            st.error("Benefícios esperados são obrigatórios")
-            return False
+        # Valida passos do processo
+        if not self.form_data.data.get("steps_as_is"):
+            errors.append("Passos do processo são obrigatórios")
+            is_valid = False
         
-        return True
-    
-    def get_data(self) -> Dict[str, Any]:
-        """
-        Obtém os dados do formulário.
+        # Valida sistemas/ferramentas
+        if not self.form_data.data.get("systems"):
+            errors.append("Sistemas/ferramentas são obrigatórios")
+            is_valid = False
         
-        Returns:
-            Dict[str, Any]: Dados do formulário
-        """
-        return {
-            "current_process": st.session_state.get("current_process", ""),
-            "pain_points": st.session_state.get("pain_points", ""),
-            "expected_benefits": st.session_state.get("expected_benefits", ""),
-            "stakeholders": st.session_state.get("stakeholders", ""),
-            "constraints": st.session_state.get("constraints", ""),
-            "additional_info": st.session_state.get("additional_info", "")
-        }
-    
-    def save(self) -> bool:
-        """
-        Salva os dados do formulário.
+        # Valida dados utilizados
+        if not self.form_data.data.get("data_used"):
+            errors.append("Dados utilizados são obrigatórios")
+            is_valid = False
         
-        Returns:
-            bool: True se salvo com sucesso, False caso contrário
-        """
-        data = self.get_data()
-        is_valid = self.validate()
-        
-        # Atualiza estado
-        self.state_manager.update_form_data(
-            self.form_id,
-            data=data,
-            is_valid=is_valid,
-            state=FormState.COMPLETED if is_valid else FormState.INVALID
-        )
+        # Mostra erros se houver
+        for error in errors:
+            st.error(error)
         
         return is_valid
     
     def render(self) -> None:
         """Renderiza o formulário."""
-        st.write("### 📋 Detalhes do Processo")
+        self.render_form_header("📋 Detalhes do Processo")
         
-        # Processo atual
-        st.text_area(
-            "Processo Atual",
-            key="current_process",
-            value=self.form_data.data.get("current_process", ""),
-            help="Descreva como o processo é executado atualmente",
+        # Passos do processo
+        new_steps = self.steps_field.render_text_area(
+            "Passos do Processo (As-Is)",
+            value=self.form_data.data.get("steps_as_is", ""),
+            is_disabled=not self.is_editing,
+            help="Descreva os passos atuais do processo",
             height=150
         )
+        if self.is_editing:
+            self.update_field("steps_as_is", new_steps)
         
-        # Pontos de dor e benefícios
+        # Sistemas e dados em duas colunas
         col1, col2 = st.columns(2)
         
         with col1:
-            st.text_area(
-                "Pontos de Dor",
-                key="pain_points",
-                value=self.form_data.data.get("pain_points", ""),
-                help="Liste os principais problemas do processo atual",
-                height=150
+            new_systems = self.systems_field.render_text_area(
+                "Sistemas/Ferramentas",
+                value=self.form_data.data.get("systems", ""),
+                is_disabled=not self.is_editing,
+                help="Liste os sistemas e ferramentas utilizados",
+                height=100
             )
+            if self.is_editing:
+                self.update_field("systems", new_systems)
         
         with col2:
-            st.text_area(
-                "Benefícios Esperados",
-                key="expected_benefits",
-                value=self.form_data.data.get("expected_benefits", ""),
-                help="Descreva os benefícios esperados com a automação",
-                height=150
+            new_data = self.data_field.render_text_area(
+                "Dados Utilizados",
+                value=self.form_data.data.get("data_used", ""),
+                is_disabled=not self.is_editing,
+                help="Descreva os dados manipulados no processo",
+                height=100
             )
+            if self.is_editing:
+                self.update_field("data_used", new_data)
         
-        # Stakeholders e restrições
-        st.text_area(
-            "Stakeholders",
-            key="stakeholders",
-            value=self.form_data.data.get("stakeholders", ""),
-            help="Liste as pessoas/áreas envolvidas no processo"
-        )
-        
-        st.text_area(
-            "Restrições",
-            key="constraints",
-            value=self.form_data.data.get("constraints", ""),
-            help="Liste restrições ou limitações do processo"
-        )
-        
-        # Informações adicionais
-        st.text_area(
-            "Informações Adicionais",
-            key="additional_info",
-            value=self.form_data.data.get("additional_info", ""),
-            help="Outras informações relevantes"
-        )
-        
-        # Botões de ação
-        col1, col2, col3 = st.columns(3)
+        # Volume e frequência em duas colunas
+        col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("💾 Salvar", use_container_width=True):
-                if self.save():
-                    st.success("Dados salvos com sucesso!")
-                    st.rerun()
+            new_volume = self.volume_field.render_text_input(
+                "Volume de Processamento",
+                value=self.form_data.data.get("volume", ""),
+                is_disabled=not self.is_editing,
+                help="Volume médio de processamento (ex: 100 registros/dia)"
+            )
+            if self.is_editing:
+                self.update_field("volume", new_volume)
         
         with col2:
-            if st.button("🔄 Limpar", use_container_width=True):
-                self.state_manager.clear_form(self.form_id)
-                st.rerun()
+            new_frequency = self.frequency_field.render_text_input(
+                "Frequência",
+                value=self.form_data.data.get("frequency", ""),
+                is_disabled=not self.is_editing,
+                help="Frequência de execução (ex: diário, semanal)"
+            )
+            if self.is_editing:
+                self.update_field("frequency", new_frequency)
         
-        with col3:
-            if st.button("❌ Cancelar", use_container_width=True):
-                self.state_manager.clear_form(self.form_id)
-                st.warning("Edição cancelada")
-                st.rerun() 
+        # Informações adicionais
+        new_info = self.additional_info_field.render_text_area(
+            "Informações Adicionais",
+            value=self.form_data.data.get("additional_info", ""),
+            is_disabled=not self.is_editing,
+            help="Outras informações relevantes",
+            height=100
+        )
+        if self.is_editing:
+            self.update_field("additional_info", new_info) 

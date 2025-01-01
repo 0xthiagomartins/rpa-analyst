@@ -83,11 +83,11 @@ class ProcessTimeline:
                 order=6
             ),
             TimelineStep(
-                id="automation",
-                title="Automação",
+                id="goals",
+                title="Objetivos",
                 description="Objetivos e KPIs",
                 status=StepStatus.PENDING,
-                icon="🤖",
+                icon="🎯",
                 order=7
             ),
             TimelineStep(

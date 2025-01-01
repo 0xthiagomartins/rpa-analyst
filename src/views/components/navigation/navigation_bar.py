@@ -74,9 +74,9 @@ class NavigationBar:
                 "is_completed": False
             },
             {
-                "id": "automation",
-                "title": "Automação",
-                "icon": "🤖",
+                "id": "goals",
+                "title": "Objetivos",
+                "icon": "🎯",
                 "order": 7,
                 "is_active": False,
                 "has_errors": False,

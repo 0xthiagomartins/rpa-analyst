@@ -1,338 +1,350 @@
-"""Formulário de riscos do processo."""
-from typing import Optional, Dict, Any, List
+"""Formulário de riscos e mitigações."""
+from typing import Optional, List, Dict
 import streamlit as st
 from utils.container_interface import ContainerInterface
-from views.components.state.state_manager import StateManager, FormState
+from views.components.forms.form_base import BaseForm
+from views.components.forms.form_field import FormField
 
-class RisksForm:
-    """Formulário de riscos do processo."""
+class RisksForm(BaseForm):
+    """Formulário para riscos e mitigações."""
     
-    IMPACT_LEVELS = ["Alto", "Médio", "Baixo"]
-    PROBABILITY_LEVELS = ["Alta", "Média", "Baixa"]
+    RISK_LEVELS = ["Baixo", "Médio", "Alto", "Crítico"]
     RISK_TYPES = [
-        "Operacional", "Tecnológico", "Financeiro", 
-        "Compliance", "Segurança", "Outro"
+        "Operacional", "Tecnológico", "Financeiro", "Legal/Regulatório",
+        "Segurança", "Reputacional", "Processo", "Outro"
     ]
     
     def __init__(self, container: Optional[ContainerInterface] = None):
-        """
-        Inicializa o formulário.
+        """Inicializa o formulário."""
+        super().__init__("risks", container)
         
-        Args:
-            container: Container de dependências opcional
-        """
-        self.container = container
-        self.state_manager = StateManager()
-        self.form_id = "risks"
+        # Inicializa campos
+        self.risks_field = FormField(self.form_id, "risks")
+        self.mitigations_field = FormField(self.form_id, "mitigations")
+        self.contingencies_field = FormField(self.form_id, "contingencies")
         
-        # Carrega dados existentes
-        self.form_data = self.state_manager.get_form_data(self.form_id)
-        
-        # Inicializa lista de riscos se necessário
+        # Inicializa listas se não existirem
         if "risks_list" not in st.session_state:
             st.session_state.risks_list = self.form_data.data.get("risks", [])
+        if "mitigations_list" not in st.session_state:
+            st.session_state.mitigations_list = self.form_data.data.get("mitigations", [])
+        if "contingencies_list" not in st.session_state:
+            st.session_state.contingencies_list = self.form_data.data.get("contingencies", [])
     
     def validate(self) -> bool:
-        """
-        Valida os dados do formulário.
+        """Valida os dados do formulário."""
+        is_valid = True
+        errors = []
         
-        Returns:
-            bool: True se válido, False caso contrário
-        """
-        data = self.get_data()
-        risks = data.get("risks", [])
+        # Só valida se a flag de validação estiver ativa
+        if not st.session_state[f"{self.form_id}_show_validation"]:
+            return True
         
-        if not risks:
-            st.error("Adicione pelo menos um risco")
-            return False
+        # Valida riscos
+        if not st.session_state.risks_list:
+            errors.append("Pelo menos um risco deve ser identificado")
+            is_valid = False
         
-        for risk in risks:
-            if not risk.get("description"):
-                st.error("Todos os riscos precisam ter uma descrição")
-                return False
-            if not risk.get("type"):
-                st.error("Todos os riscos precisam ter um tipo")
-                return False
-            if not risk.get("impact"):
-                st.error("Todos os riscos precisam ter um impacto definido")
-                return False
-            if not risk.get("probability"):
-                st.error("Todos os riscos precisam ter uma probabilidade definida")
-                return False
+        # Valida mitigações para riscos altos/críticos
+        high_risks = [r for r in st.session_state.risks_list if r["level"] in ["Alto", "Crítico"]]
+        risks_with_mitigation = {m["risk_index"] for m in st.session_state.mitigations_list}
         
-        return True
-    
-    def get_data(self) -> Dict[str, Any]:
-        """
-        Obtém os dados do formulário.
+        for i, risk in enumerate(high_risks):
+            if i not in risks_with_mitigation:
+                errors.append(f"O risco '{risk['description'][:50]}...' é {risk['level']} e requer plano de mitigação")
+                is_valid = False
         
-        Returns:
-            Dict[str, Any]: Dados do formulário
-        """
-        return {
-            "risks": st.session_state.risks_list,
-            "risk_assessment": st.session_state.get("risk_assessment", ""),
-            "mitigation_strategy": st.session_state.get("mitigation_strategy", ""),
-            "contingency_plan": st.session_state.get("contingency_plan", ""),
-            "monitoring_plan": st.session_state.get("monitoring_plan", "")
-        }
-    
-    def save(self) -> bool:
-        """
-        Salva os dados do formulário.
+        # Valida contingências para riscos críticos
+        critical_risks = [r for r in st.session_state.risks_list if r["level"] == "Crítico"]
+        risks_with_contingency = {c["risk_index"] for c in st.session_state.contingencies_list}
         
-        Returns:
-            bool: True se salvo com sucesso, False caso contrário
-        """
-        data = self.get_data()
-        is_valid = self.validate()
+        for i, risk in enumerate(critical_risks):
+            if i not in risks_with_contingency:
+                errors.append(f"O risco '{risk['description'][:50]}...' é Crítico e requer plano de contingência")
+                is_valid = False
         
-        # Atualiza estado
-        self.state_manager.update_form_data(
-            self.form_id,
-            data=data,
-            is_valid=is_valid,
-            state=FormState.COMPLETED if is_valid else FormState.INVALID
-        )
+        # Mostra erros se houver
+        for error in errors:
+            st.error(error)
         
         return is_valid
     
-    def _calculate_risk_level(self, impact: str, probability: str) -> str:
-        """
-        Calcula o nível de risco com base no impacto e probabilidade.
-        
-        Args:
-            impact: Nível de impacto
-            probability: Nível de probabilidade
+    def _add_risk(self) -> None:
+        """Adiciona um novo risco."""
+        col1, col2 = st.columns(2)
+        with col1:
+            risk_type = st.selectbox(
+                "Tipo de Risco",
+                options=self.RISK_TYPES,
+                key="new_risk_type"
+            )
+        with col2:
+            level = st.selectbox(
+                "Nível de Risco",
+                options=self.RISK_LEVELS,
+                key="new_risk_level"
+            )
             
-        Returns:
-            str: Nível de risco (Alto, Médio ou Baixo)
-        """
-        # Matriz de risco 3x3
-        risk_matrix = {
-            ("Alto", "Alta"): "Alto",
-            ("Alto", "Média"): "Alto",
-            ("Alto", "Baixa"): "Médio",
-            ("Médio", "Alta"): "Alto",
-            ("Médio", "Média"): "Médio",
-            ("Médio", "Baixa"): "Baixo",
-            ("Baixo", "Alta"): "Médio",
-            ("Baixo", "Média"): "Baixo",
-            ("Baixo", "Baixa"): "Baixo"
-        }
+        description = st.text_area(
+            "Descrição do Risco",
+            key="new_risk_desc",
+            help="Descreva o risco e seu impacto potencial"
+        )
         
-        return risk_matrix.get((impact, probability), "Médio")
-    
-    def _get_risk_color(self, level: str) -> str:
-        """
-        Retorna a cor para o nível de risco.
-        
-        Args:
-            level: Nível de risco
+        impact = st.text_area(
+            "Impacto",
+            key="new_risk_impact",
+            help="Descreva o impacto caso o risco se materialize"
+        )
             
-        Returns:
-            str: Código de cor HTML
-        """
-        colors = {
-            "Alto": "#ff4b4b",
-            "Médio": "#ffa64b",
-            "Baixo": "#4bff4b"
-        }
-        return colors.get(level, "#ffffff")
+        if st.button("➕ Adicionar Risco"):
+            if risk_type and level and description and impact:
+                new_risk = {
+                    "type": risk_type,
+                    "level": level,
+                    "description": description,
+                    "impact": impact
+                }
+                st.session_state.risks_list.append(new_risk)
+                self.update_field("risks", st.session_state.risks_list)
+                st.rerun()
+            else:
+                st.error("Preencha todos os campos")
     
-    def _add_risk(
-        self,
-        description: str,
-        risk_type: str,
-        impact: str,
-        probability: str,
-        mitigation: str
-    ) -> None:
-        """
-        Adiciona um novo risco à lista.
-        
-        Args:
-            description: Descrição do risco
-            risk_type: Tipo do risco
-            impact: Nível de impacto
-            probability: Nível de probabilidade
-            mitigation: Medidas de mitigação
-        """
-        if not description:
-            st.error("Descrição do risco é obrigatória")
+    def _add_mitigation(self) -> None:
+        """Adiciona um novo plano de mitigação."""
+        if not st.session_state.risks_list:
+            st.warning("Adicione riscos primeiro")
             return
             
-        if not risk_type:
-            st.error("Tipo do risco é obrigatório")
-            return
+        risk_options = [f"{r['type']} - {r['description'][:50]}..." for r in st.session_state.risks_list]
+        risk_index = st.selectbox(
+            "Risco Relacionado",
+            options=range(len(risk_options)),
+            format_func=lambda x: risk_options[x],
+            key="new_mitigation_risk"
+        )
         
-        # Calcula nível de risco
-        risk_level = self._calculate_risk_level(impact, probability)
+        strategy = st.text_area(
+            "Estratégia de Mitigação",
+            key="new_mitigation_strategy",
+            help="Descreva as ações para reduzir a probabilidade ou impacto"
+        )
         
-        new_risk = {
-            "description": description,
-            "type": risk_type,
-            "impact": impact,
-            "probability": probability,
-            "level": risk_level,
-            "mitigation": mitigation
-        }
-        
-        st.session_state.risks_list.append(new_risk)
-        st.session_state.new_risk_description = ""
-        st.session_state.new_risk_type = ""
-        st.session_state.new_risk_impact = ""
-        st.session_state.new_risk_probability = ""
-        st.session_state.new_risk_mitigation = ""
+        responsible = st.text_input(
+            "Responsável",
+            key="new_mitigation_responsible"
+        )
+            
+        if st.button("➕ Adicionar Mitigação"):
+            if strategy and responsible:
+                new_mitigation = {
+                    "risk_index": risk_index,
+                    "strategy": strategy,
+                    "responsible": responsible
+                }
+                st.session_state.mitigations_list.append(new_mitigation)
+                self.update_field("mitigations", st.session_state.mitigations_list)
+                st.rerun()
+            else:
+                st.error("Preencha todos os campos")
     
-    def _remove_risk(self, index: int) -> None:
-        """
-        Remove um risco da lista.
+    def _add_contingency(self) -> None:
+        """Adiciona um novo plano de contingência."""
+        if not st.session_state.risks_list:
+            st.warning("Adicione riscos primeiro")
+            return
+            
+        risk_options = [f"{r['type']} - {r['description'][:50]}..." for r in st.session_state.risks_list]
+        risk_index = st.selectbox(
+            "Risco Relacionado",
+            options=range(len(risk_options)),
+            format_func=lambda x: risk_options[x],
+            key="new_contingency_risk"
+        )
         
-        Args:
-            index: Índice do risco a ser removido
-        """
-        st.session_state.risks_list.pop(index)
+        plan = st.text_area(
+            "Plano de Contingência",
+            key="new_contingency_plan",
+            help="Descreva as ações caso o risco se materialize"
+        )
+        
+        trigger = st.text_input(
+            "Gatilho",
+            key="new_contingency_trigger",
+            help="Quando este plano deve ser acionado?"
+        )
+            
+        if st.button("➕ Adicionar Contingência"):
+            if plan and trigger:
+                new_contingency = {
+                    "risk_index": risk_index,
+                    "plan": plan,
+                    "trigger": trigger
+                }
+                st.session_state.contingencies_list.append(new_contingency)
+                self.update_field("contingencies", st.session_state.contingencies_list)
+                st.rerun()
+            else:
+                st.error("Preencha todos os campos")
     
     def render(self) -> None:
         """Renderiza o formulário."""
-        st.write("### ⚠️ Riscos do Processo")
+        self.render_form_header("⚠️ Riscos e Mitigações")
+        
+        # Seção de Riscos
+        st.write("#### Riscos Identificados")
+        
+        # Lista riscos existentes
+        for i, risk in enumerate(st.session_state.risks_list):
+            st.markdown("---")
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                new_type = st.selectbox(
+                    "Tipo",
+                    options=self.RISK_TYPES,
+                    index=self.RISK_TYPES.index(risk["type"]),
+                    key=f"risk_type_{i}",
+                    disabled=not self.is_editing
+                )
+            with col2:
+                new_level = st.selectbox(
+                    "Nível",
+                    options=self.RISK_LEVELS,
+                    index=self.RISK_LEVELS.index(risk["level"]),
+                    key=f"risk_level_{i}",
+                    disabled=not self.is_editing
+                )
+            with col3:
+                if self.is_editing and st.button("🗑️", key=f"del_risk_{i}"):
+                    st.session_state.risks_list.pop(i)
+                    self.update_field("risks", st.session_state.risks_list)
+                    st.rerun()
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                new_description = st.text_area(
+                    "Descrição",
+                    value=risk["description"],
+                    key=f"risk_desc_{i}",
+                    disabled=not self.is_editing
+                )
+            with col2:
+                new_impact = st.text_area(
+                    "Impacto",
+                    value=risk["impact"],
+                    key=f"risk_impact_{i}",
+                    disabled=not self.is_editing
+                )
+            
+            if self.is_editing and (
+                new_type != risk["type"] or
+                new_level != risk["level"] or
+                new_description != risk["description"] or
+                new_impact != risk["impact"]
+            ):
+                st.session_state.risks_list[i] = {
+                    "type": new_type,
+                    "level": new_level,
+                    "description": new_description,
+                    "impact": new_impact
+                }
+                self.update_field("risks", st.session_state.risks_list)
         
         # Adicionar novo risco
-        st.write("#### Adicionar Novo Risco")
+        if self.is_editing:
+            self._add_risk()
         
-        # Descrição e tipo
-        col1, col2 = st.columns([3, 1])
+        # Seção de Mitigações
+        st.write("#### Planos de Mitigação")
         
-        with col1:
-            description = st.text_area(
-                "Descrição do Risco",
-                key="new_risk_description",
-                help="Descreva o risco identificado"
-            )
-        
-        with col2:
-            risk_type = st.selectbox(
-                "Tipo",
-                options=self.RISK_TYPES,
-                key="new_risk_type",
-                help="Tipo do risco"
-            )
-        
-        # Impacto e probabilidade
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            impact = st.selectbox(
-                "Impacto",
-                options=self.IMPACT_LEVELS,
-                key="new_risk_impact",
-                help="Nível de impacto"
-            )
-        
-        with col2:
-            probability = st.selectbox(
-                "Probabilidade",
-                options=self.PROBABILITY_LEVELS,
-                key="new_risk_probability",
-                help="Probabilidade de ocorrência"
-            )
-        
-        # Mitigação
-        mitigation = st.text_area(
-            "Medidas de Mitigação",
-            key="new_risk_mitigation",
-            help="Descreva as medidas para mitigar este risco"
-        )
-        
-        if st.button("➕ Adicionar Risco", use_container_width=True):
-            self._add_risk(description, risk_type, impact, probability, mitigation)
-            st.rerun()
-        
-        # Lista de riscos
-        st.write("#### Riscos Cadastrados")
-        for i, risk in enumerate(st.session_state.risks_list):
-            with st.container():
-                # Cabeçalho do risco
-                col1, col2 = st.columns([4, 1])
-                
-                with col1:
-                    st.markdown(
-                        f"**{risk['type']}** | "
-                        f"<span style='color: {self._get_risk_color(risk['level'])}'>⬤</span> "
-                        f"Nível: {risk['level']}",
-                        unsafe_allow_html=True
-                    )
-                
-                with col2:
-                    if st.button("🗑️", key=f"del_risk_{i}"):
-                        self._remove_risk(i)
-                        st.rerun()
-                
-                # Detalhes do risco
-                st.write(risk['description'])
-                st.write(
-                    f"📊 Impacto: {risk['impact']} | "
-                    f"📈 Probabilidade: {risk['probability']}"
+        # Lista mitigações existentes
+        for i, mitigation in enumerate(st.session_state.mitigations_list):
+            st.markdown("---")
+            
+            # Mostra o risco relacionado
+            risk = st.session_state.risks_list[mitigation["risk_index"]]
+            st.write(f"**Risco:** {risk['type']} - {risk['description'][:100]}...")
+            
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                new_strategy = st.text_area(
+                    "Estratégia",
+                    value=mitigation["strategy"],
+                    key=f"mitigation_strategy_{i}",
+                    disabled=not self.is_editing
                 )
-                if risk.get('mitigation'):
-                    st.write("🛡️ Mitigação:", risk['mitigation'])
-                
-                st.divider()
-        
-        # Informações adicionais
-        st.write("#### Informações Adicionais")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.text_area(
-                "Avaliação de Riscos",
-                key="risk_assessment",
-                value=self.form_data.data.get("risk_assessment", ""),
-                help="Avaliação geral dos riscos"
-            )
-            
-            st.text_area(
-                "Estratégia de Mitigação",
-                key="mitigation_strategy",
-                value=self.form_data.data.get("mitigation_strategy", ""),
-                help="Estratégia geral de mitigação"
-            )
-        
-        with col2:
-            st.text_area(
-                "Plano de Contingência",
-                key="contingency_plan",
-                value=self.form_data.data.get("contingency_plan", ""),
-                help="Plano para caso os riscos se concretizem"
-            )
-            
-            st.text_area(
-                "Plano de Monitoramento",
-                key="monitoring_plan",
-                value=self.form_data.data.get("monitoring_plan", ""),
-                help="Como os riscos serão monitorados"
-            )
-        
-        # Botões de ação
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("💾 Salvar", use_container_width=True):
-                if self.save():
-                    st.success("Dados salvos com sucesso!")
+            with col2:
+                new_responsible = st.text_input(
+                    "Responsável",
+                    value=mitigation["responsible"],
+                    key=f"mitigation_responsible_{i}",
+                    disabled=not self.is_editing
+                )
+            with col3:
+                if self.is_editing and st.button("🗑️", key=f"del_mitigation_{i}"):
+                    st.session_state.mitigations_list.pop(i)
+                    self.update_field("mitigations", st.session_state.mitigations_list)
                     st.rerun()
+            
+            if self.is_editing and (
+                new_strategy != mitigation["strategy"] or
+                new_responsible != mitigation["responsible"]
+            ):
+                st.session_state.mitigations_list[i] = {
+                    "risk_index": mitigation["risk_index"],
+                    "strategy": new_strategy,
+                    "responsible": new_responsible
+                }
+                self.update_field("mitigations", st.session_state.mitigations_list)
         
-        with col2:
-            if st.button("🔄 Limpar", use_container_width=True):
-                self.state_manager.clear_form(self.form_id)
-                st.session_state.risks_list = []
-                st.rerun()
+        # Adicionar nova mitigação
+        if self.is_editing:
+            self._add_mitigation()
         
-        with col3:
-            if st.button("❌ Cancelar", use_container_width=True):
-                self.state_manager.clear_form(self.form_id)
-                st.session_state.risks_list = []
-                st.warning("Edição cancelada")
-                st.rerun() 
+        # Seção de Contingências
+        st.write("#### Planos de Contingência")
+        
+        # Lista contingências existentes
+        for i, contingency in enumerate(st.session_state.contingencies_list):
+            st.markdown("---")
+            
+            # Mostra o risco relacionado
+            risk = st.session_state.risks_list[contingency["risk_index"]]
+            st.write(f"**Risco:** {risk['type']} - {risk['description'][:100]}...")
+            
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                new_plan = st.text_area(
+                    "Plano",
+                    value=contingency["plan"],
+                    key=f"contingency_plan_{i}",
+                    disabled=not self.is_editing
+                )
+            with col2:
+                new_trigger = st.text_input(
+                    "Gatilho",
+                    value=contingency["trigger"],
+                    key=f"contingency_trigger_{i}",
+                    disabled=not self.is_editing
+                )
+            with col3:
+                if self.is_editing and st.button("🗑️", key=f"del_contingency_{i}"):
+                    st.session_state.contingencies_list.pop(i)
+                    self.update_field("contingencies", st.session_state.contingencies_list)
+                    st.rerun()
+            
+            if self.is_editing and (
+                new_plan != contingency["plan"] or
+                new_trigger != contingency["trigger"]
+            ):
+                st.session_state.contingencies_list[i] = {
+                    "risk_index": contingency["risk_index"],
+                    "plan": new_plan,
+                    "trigger": new_trigger
+                }
+                self.update_field("contingencies", st.session_state.contingencies_list)
+        
+        # Adicionar nova contingência
+        if self.is_editing:
+            self._add_contingency() 
