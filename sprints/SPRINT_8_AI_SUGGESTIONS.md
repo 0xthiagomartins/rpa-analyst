@@ -11,9 +11,8 @@ Implementar sistema de sugestões automáticas usando IA para melhorar a descri�
 ### Fase 1: Atualização do AIService
 1. **Refatoração do Serviço**
    - [ ] Adaptar para novo modelo de formulários
-   - [ ] Implementar cache de respostas
+   - [ ] Implementar cache em memória
    - [ ] Adicionar logging detalhado
-   - [ ] Implementar rate limiting
    - [ ] Melhorar tratamento de erros
 
 2. **Sistema de Prompts**
@@ -27,7 +26,7 @@ Implementar sistema de sugestões automáticas usando IA para melhorar a descri�
    ```python
    class AIResponse(TypedDict):
        description: str
-       forms_data: Dict[str, Any]
+       forms_data: Dict[str, FormData]
        suggestions: List[str]
        validation: List[str]
    ```
@@ -53,16 +52,70 @@ Implementar sistema de sugestões automáticas usando IA para melhorar a descri�
 
 ## Componentes Principais
 
-### 1. AIService Atualizado
+### 1. Cache em Memória
+```python
+from typing import Any, Optional
+from datetime import datetime, timedelta
+from collections import OrderedDict
+
+class InMemoryCache:
+    """Cache em memória com interface similar ao Redis."""
+    
+    def __init__(self, max_size: int = 1000):
+        self.max_size = max_size
+        self.cache: OrderedDict[str, tuple[Any, datetime]] = OrderedDict()
+    
+    def get(self, key: str) -> Optional[Any]:
+        """Obtém valor do cache."""
+        if key not in self.cache:
+            return None
+            
+        value, expiry = self.cache[key]
+        if expiry < datetime.now():
+            del self.cache[key]
+            return None
+            
+        # Move para o fim (LRU)
+        self.cache.move_to_end(key)
+        return value
+    
+    def set(
+        self, 
+        key: str, 
+        value: Any, 
+        ttl: Optional[int] = None
+    ) -> None:
+        """Adiciona valor ao cache."""
+        # Remove item mais antigo se necessário
+        if len(self.cache) >= self.max_size:
+            self.cache.popitem(last=False)
+        
+        expiry = (
+            datetime.now() + timedelta(seconds=ttl)
+            if ttl
+            else datetime.max
+        )
+        
+        self.cache[key] = (value, expiry)
+    
+    def delete(self, key: str) -> None:
+        """Remove valor do cache."""
+        if key in self.cache:
+            del self.cache[key]
+    
+    def clear(self) -> None:
+        """Limpa todo o cache."""
+        self.cache.clear()
+```
+
+### 2. AIService Atualizado
 ```python
 class AIService:
     """Serviço de comunicação com IA."""
     
-    def __init__(self, config: Dict):
-        self.config = config
-        self.cache = Cache()
+    def __init__(self):
+        self.cache = InMemoryCache()
         self.logger = Logger()
-        self.rate_limiter = RateLimiter()
     
     async def suggest_improvements(
         self, 
@@ -76,9 +129,6 @@ class AIService:
             if cached:
                 return cached
             
-            # Rate limiting
-            await self.rate_limiter.acquire()
-            
             # Gera prompt
             prompt = self._generate_prompt(description, current_data)
             
@@ -88,8 +138,8 @@ class AIService:
             # Valida e parseia resposta
             parsed = self._parse_response(response)
             
-            # Atualiza cache
-            self.cache.set(description, parsed)
+            # Atualiza cache (24h)
+            self.cache.set(description, parsed, ttl=86400)
             
             return parsed
             
@@ -149,14 +199,13 @@ class SuggestionsManager:
 
 ## Dependências
 - OpenAI API
-- Redis para cache
 - Sistema de logging
 - Componentes atuais
 
 ## Riscos
 1. Qualidade das sugestões da IA
 2. Custo das chamadas à API
-3. Performance do cache
+3. Performance do cache em memória
 4. Complexidade do parser
 5. Usabilidade do preview
 
@@ -239,32 +288,58 @@ EXAMPLE_RESPONSE = {
 ### 2. Estratégia de Cache
 
 ```python
-class CacheConfig:
-    """Configuração do cache Redis."""
+from typing import Any, Optional
+from datetime import datetime, timedelta
+from collections import OrderedDict
+
+class InMemoryCache:
+    """Cache em memória com interface similar ao Redis."""
     
-    # Prefixos para diferentes tipos de cache
-    PREFIXES = {
-        'suggestions': 'ai:sug:',
-        'validations': 'ai:val:',
-        'improvements': 'ai:imp:'
-    }
+    def __init__(self, max_size: int = 1000):
+        self.max_size = max_size
+        self.cache: OrderedDict[str, tuple[Any, datetime]] = OrderedDict()
     
-    # Tempos de expiração (em segundos)
-    TTL = {
-        'suggestions': 3600 * 24,  # 24 horas
-        'validations': 3600,       # 1 hora
-        'improvements': 3600 * 12  # 12 horas
-    }
+    def get(self, key: str) -> Optional[Any]:
+        """Obtém valor do cache."""
+        if key not in self.cache:
+            return None
+            
+        value, expiry = self.cache[key]
+        if expiry < datetime.now():
+            del self.cache[key]
+            return None
+            
+        # Move para o fim (LRU)
+        self.cache.move_to_end(key)
+        return value
     
-    # Tamanho máximo das chaves
-    MAX_KEY_SIZE = 256
+    def set(
+        self, 
+        key: str, 
+        value: Any, 
+        ttl: Optional[int] = None
+    ) -> None:
+        """Adiciona valor ao cache."""
+        # Remove item mais antigo se necessário
+        if len(self.cache) >= self.max_size:
+            self.cache.popitem(last=False)
+        
+        expiry = (
+            datetime.now() + timedelta(seconds=ttl)
+            if ttl
+            else datetime.max
+        )
+        
+        self.cache[key] = (value, expiry)
     
-    # Critérios de invalidação
-    INVALIDATION_RULES = {
-        'on_process_update': ['suggestions', 'validations'],
-        'on_form_update': ['validations'],
-        'on_manual': ['all']
-    }
+    def delete(self, key: str) -> None:
+        """Remove valor do cache."""
+        if key in self.cache:
+            del self.cache[key]
+    
+    def clear(self) -> None:
+        """Limpa todo o cache."""
+        self.cache.clear()
 ```
 
 ### 3. Estrutura de Dados
