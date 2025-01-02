@@ -2,28 +2,20 @@
 import streamlit as st
 from typing import List, Dict, Optional
 from src.services.ai_service import AIService
-from src.services.ai_types import AIResponse, FormData, SuggestionPreview
+from src.services.ai_types import AIResponse, FormData
 from src.utils.logger import Logger
+from src.views.components.state.suggestions_buffer import SuggestionsState, SuggestionBuffer
 
 class SuggestionsManager:
     """Gerenciador de sugestões da IA."""
     
-    def __init__(self, api_key: str):
-        """
-        Inicializa o gerenciador.
-        
-        Args:
-            api_key: Chave da API OpenAI
-        """
-        self.ai_service = AIService(api_key)
+    def __init__(self):
+        """Inicializa o gerenciador."""
         self.logger = Logger()
-        
-        # Inicializa estado
-        if "suggestions_buffer" not in st.session_state:
-            st.session_state.suggestions_buffer = None
-    
+        self.ai_service = AIService()
+
     async def request_suggestions(
-        self, 
+        self,
         description: str,
         current_data: Optional[Dict] = None
     ) -> None:
@@ -35,113 +27,90 @@ class SuggestionsManager:
             current_data: Dados atuais dos formulários
         """
         try:
-            with st.spinner("Gerando sugestões..."):
-                suggestions = await self.ai_service.suggest_improvements(
-                    description,
-                    current_data
-                )
-                st.session_state.suggestions_buffer = suggestions
-                
+            # Obtém sugestões da IA
+            response = await self.ai_service.analyze_process(
+                description=description,
+                current_data=current_data or {}
+            )
+            
+            # Armazena no buffer
+            buffer = SuggestionBuffer.from_response(response)
+            SuggestionsState.set_buffer(buffer)
+            
         except Exception as e:
             self.logger.error(f"Erro ao solicitar sugestões: {str(e)}")
             st.error("Não foi possível gerar sugestões. Tente novamente.")
-    
-    def render_preview(self) -> None:
-        """Renderiza preview das sugestões."""
-        if not st.session_state.suggestions_buffer:
+
+    def render_preview(self, form_id: Optional[str] = None) -> None:
+        """
+        Renderiza preview das sugestões.
+        
+        Args:
+            form_id: ID do formulário atual (opcional)
+        """
+        buffer = SuggestionsState.get_buffer()
+        if not buffer:
             return
             
-        suggestions = st.session_state.suggestions_buffer
-        
-        st.write("### 📝 Sugestões de Melhoria")
-        
-        # Descrição melhorada
-        with st.expander("✨ Descrição Formal", expanded=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write("**Original:**")
-                st.text(suggestions["description"])
-            with col2:
-                st.write("**Sugerido:**")
-                st.text(suggestions["description"])
-            
-            if st.button("Aplicar Melhoria"):
-                self._apply_description(suggestions["description"])
-        
-        # Sugestões gerais
-        if suggestions["suggestions"]:
-            with st.expander("💡 Sugestões", expanded=True):
-                for suggestion in suggestions["suggestions"]:
+        with st.expander("✨ Sugestões da IA", expanded=True):
+            # Mostra sugestões gerais
+            if buffer.suggestions:
+                st.write("##### Sugestões Gerais")
+                for suggestion in buffer.suggestions:
                     st.info(suggestion)
-        
-        # Validações
-        if suggestions["validation"]:
-            with st.expander("⚠️ Validações", expanded=True):
-                for validation in suggestions["validation"]:
-                    st.warning(validation)
-        
-        # Formulários
-        if suggestions["forms_data"]:
-            with st.expander("📋 Dados Sugeridos", expanded=True):
-                selected_forms = []
+            
+            # Mostra preview dos formulários
+            if buffer.forms_data:
+                st.write("##### Sugestões para Formulários")
                 
-                for form_id, form_data in suggestions["forms_data"].items():
-                    st.write(f"**{form_id.title()}**")
-                    
-                    # Mostra dados sugeridos
-                    st.json(form_data["data"])
-                    
-                    # Checkbox para seleção
-                    if st.checkbox(f"Aplicar em {form_id}", key=f"apply_{form_id}"):
-                        selected_forms.append(form_id)
+                # Se form_id fornecido, mostra apenas sugestões relevantes
+                forms = (
+                    [form_id] if form_id and form_id in buffer.forms_data
+                    else list(buffer.forms_data.keys())
+                )
                 
-                # Botões de ação
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("✅ Aplicar Selecionados", disabled=not selected_forms):
+                selected_forms = st.multiselect(
+                    "Selecione os formulários para aplicar sugestões:",
+                    options=forms,
+                    default=forms[0] if forms else None
+                )
+                
+                if selected_forms:
+                    if st.button("✅ Aplicar Sugestões Selecionadas"):
                         self._apply_suggestions(selected_forms)
-                        st.success("Sugestões aplicadas com sucesso!")
+                        st.success("Sugestões aplicadas!")
                         st.rerun()
-                
-                with col2:
-                    if st.button("❌ Descartar"):
+                    
+                    if st.button("❌ Descartar Sugestões"):
                         self._discard_suggestions()
                         st.rerun()
-    
-    def _apply_description(self, description: str) -> None:
-        """
-        Aplica descrição melhorada.
-        
-        Args:
-            description: Nova descrição
-        """
-        if "process_data" not in st.session_state:
-            st.session_state.process_data = {}
-            
-        st.session_state.process_data["description"] = description
-    
+
     def _apply_suggestions(self, selected_forms: List[str]) -> None:
-        """
-        Aplica sugestões aos formulários selecionados.
-        
-        Args:
-            selected_forms: Lista de IDs dos formulários
-        """
-        if not st.session_state.suggestions_buffer:
+        """Aplica sugestões aos formulários selecionados."""
+        buffer = SuggestionsState.get_buffer()
+        if not buffer:
             return
             
-        suggestions = st.session_state.suggestions_buffer
-        
         for form_id in selected_forms:
-            if form_id in suggestions["forms_data"]:
-                form_data = suggestions["forms_data"][form_id]
+            if form_id in buffer.forms_data:
+                form_data = buffer.forms_data[form_id]["data"]
                 
                 # Atualiza dados do formulário
-                if form_id not in st.session_state:
-                    st.session_state[form_id] = {}
-                    
-                st.session_state[form_id].update(form_data["data"])
+                for key, value in form_data.items():
+                    if isinstance(value, list):
+                        # Para listas, substitui diretamente
+                        st.session_state[key] = value.copy()
+                    else:
+                        # Para outros tipos, usa update se possível
+                        if key not in st.session_state:
+                            st.session_state[key] = value
+                        elif hasattr(st.session_state[key], 'update'):
+                            st.session_state[key].update(value)
+                        else:
+                            st.session_state[key] = value
+                
+                SuggestionsState.mark_as_applied(form_id)
     
     def _discard_suggestions(self) -> None:
         """Descarta sugestões atuais."""
-        st.session_state.suggestions_buffer = None 
+        SuggestionsState.clear_buffer() 

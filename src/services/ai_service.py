@@ -1,7 +1,8 @@
 """Serviço de comunicação com IA."""
 import json
 from typing import Optional, Dict, Any
-import openai
+from langchain_openai import ChatOpenAI
+from langchain.schema import HumanMessage, SystemMessage
 from src.utils.cache import InMemoryCache
 from src.utils.logger import Logger
 from .ai_types import AIResponse, FormData
@@ -20,57 +21,62 @@ class AIService:
     Siga estritamente o formato de resposta especificado.
     """
     
-    def __init__(self, api_key: str):
+    def __init__(self, model_name: str = "gpt-4"):
         """
         Inicializa o serviço.
         
         Args:
-            api_key: Chave da API OpenAI
+            model_name: Nome do modelo a ser usado
         """
-        self.cache = InMemoryCache()
         self.logger = Logger()
-        openai.api_key = api_key
-    
-    async def suggest_improvements(
-        self, 
+        self.cache = InMemoryCache()
+        self.llm = ChatOpenAI(
+            model_name=model_name,
+            temperature=0.7
+        )
+
+    async def analyze_process(
+        self,
         description: str,
         current_data: Optional[Dict] = None
     ) -> AIResponse:
         """
-        Sugere melhorias e gera dados estruturados.
+        Analisa descrição do processo e gera sugestões.
         
         Args:
             description: Descrição do processo
-            current_data: Dados atuais dos formulários (opcional)
+            current_data: Dados atuais dos formulários
             
         Returns:
-            Resposta estruturada da IA
+            AIResponse com sugestões e dados
         """
         try:
-            # Verifica cache
-            cache_key = f"suggestions:{description}"
+            # Tenta obter do cache primeiro
+            cache_key = f"analysis_{hash(description)}"
             cached = self.cache.get(cache_key)
             if cached:
-                self.logger.info("Usando resposta em cache")
                 return cached
-            
+                
             # Gera prompt
             prompt = self._generate_prompt(description, current_data)
             
-            # Processa com IA
-            self.logger.info("Processando com IA")
-            response = await self._process_with_ai(prompt)
+            # Prepara mensagens
+            messages = [
+                SystemMessage(content=self.SYSTEM_PROMPT),
+                HumanMessage(content=prompt)
+            ]
             
-            # Valida e parseia resposta
-            parsed = self._parse_response(response)
+            # Faz requisição via LangChain
+            response = await self.llm.agenerate([messages])
+            result = self._parse_response(response.generations[0][0].text)
             
-            # Atualiza cache (24h)
-            self.cache.set(cache_key, parsed, ttl=86400)
+            # Salva no cache
+            self.cache.set(cache_key, result)
             
-            return parsed
+            return result
             
         except Exception as e:
-            self.logger.error(f"Erro ao processar sugestões: {str(e)}")
+            self.logger.error(f"Erro ao analisar processo: {str(e)}")
             raise
     
     def _generate_prompt(
@@ -95,28 +101,6 @@ class AIService:
             prompt += f"\n\nDados atuais dos formulários:\n{json.dumps(current_data, indent=2)}"
             
         return prompt
-    
-    async def _process_with_ai(self, prompt: str) -> str:
-        """Processa prompt com a IA."""
-        try:
-            response = await openai.ChatCompletion.acreate(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": self.SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=2000
-            )
-            
-            # Ajuste para acessar o dicionário corretamente
-            if isinstance(response, dict):
-                return response['choices'][0]['message']['content']
-            return response.choices[0].message.content
-            
-        except Exception as e:
-            self.logger.error(f"Erro na chamada à API: {str(e)}")
-            raise
     
     def _parse_response(self, response: str) -> AIResponse:
         """

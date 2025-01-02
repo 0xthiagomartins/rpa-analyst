@@ -6,36 +6,32 @@ from src.views.components.suggestions.suggestions_manager import SuggestionsMana
 class SuggestionButton:
     """Botão de sugestões com preview."""
     
-    def __init__(self, api_key: str):
-        """
-        Inicializa o componente.
-        
-        Args:
-            api_key: Chave da API OpenAI
-        """
-        self.manager = SuggestionsManager(api_key)
+    def __init__(self):
+        """Inicializa o componente."""
+        self.manager = SuggestionsManager()
     
     async def render(
-        self, 
+        self,
         description: str,
         current_data: Optional[Dict] = None,
         disabled: bool = False
     ) -> None:
         """
-        Renderiza o botão e preview.
+        Renderiza o botão de sugestões.
         
         Args:
             description: Descrição do processo
-            current_data: Dados atuais dos formulários
+            current_data: Dados atuais do formulário
             disabled: Se o botão deve estar desabilitado
         """
-        col1, col2 = st.columns([1, 4])
+        col1, col2 = st.columns([1, 3])
         
         with col1:
             if st.button(
-                "✨ Sugerir Melhorias", 
+                "🤖 Gerar Sugestões",
                 disabled=disabled,
-                help="Gera sugestões usando IA"
+                use_container_width=True,
+                key="btn_suggestions"
             ):
                 st.session_state.requesting_suggestions = True
         

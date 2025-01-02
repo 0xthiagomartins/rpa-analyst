@@ -4,7 +4,40 @@
 Implementar sistema de sugestões automáticas usando IA para melhorar a descrição do processo e auto-preencher formulários subsequentes.
 
 ## Status Atual
-🟡 Em Andamento (60%)
+🟡 Em Andamento (75%)
+
+### Concluído
+1. ✅ Cache em memória (InMemoryCache)
+2. ✅ AIService com testes
+3. ✅ Tipos de dados (ai_types.py)
+4. ✅ Sistema de prompts básico
+5. ✅ IdentificationForm com sugestões
+6. ✅ SuggestionButton
+7. ✅ Buffer de sugestões no session_state
+8. ✅ Controle de estado das sugestões
+9. ✅ Preview contextual por formulário
+
+### Em Andamento
+1. 🟡 Implementar preview nos outros formulários
+2. 🟡 Sistema de distribuição de dados
+3. 🟡 Aplicação seletiva de sugestões
+
+### Próximos Passos
+1. Implementar preview nos formulários:
+   - [✓] ProcessDetailsForm
+   - [✓] BusinessRulesForm
+   - [✓] AutomationGoalsForm
+   - [ ] SystemsForm
+   - [ ] DataForm
+   - [ ] StepsForm
+   - [ ] RisksForm
+   - [ ] DocumentationForm
+
+2. Melhorias no sistema de sugestões:
+   - [ ] Validação de dados antes da aplicação
+   - [ ] Preview de mudanças
+   - [ ] Histórico de sugestões
+   - [ ] Rollback de mudanças
 
 ## Fases de Implementação
 

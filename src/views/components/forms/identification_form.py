@@ -1,67 +1,81 @@
 """Formulário de identificação do processo."""
 import streamlit as st
 from typing import Optional, Dict
-from src.views.components.suggestions.suggestion_button import SuggestionButton
+from src.utils.logger import Logger
+from .form_base import SuggestibleForm
 
-class IdentificationForm:
+class IdentificationForm(SuggestibleForm):
     """Formulário de identificação do processo."""
     
-    def __init__(self, api_key: Optional[str] = None):
-        """
-        Inicializa o formulário.
-        
-        Args:
-            api_key: Chave da API OpenAI (opcional)
-        """
-        self.suggestion_button = (
-            SuggestionButton(api_key) if api_key else None
-        )
-    
-    async def render(self) -> None:
+    def __init__(self):
+        """Inicializa o formulário."""
+        super().__init__("identification")
+        self.logger = Logger()
+
+    async def render(self):
         """Renderiza o formulário."""
-        st.write("### Identificação do Processo")
+        st.write("### 🎯 Identificação do Processo")
         
         # Campos do formulário
-        description = st.text_area(
-            "Descrição do Processo",
-            value=st.session_state.get('process_data', {}).get('description', ''),
-            help="Descreva o processo em detalhes"
-        )
-        
         name = st.text_input(
             "Nome do Processo",
-            value=st.session_state.get('process_data', {}).get('name', ''),
-            help="Nome curto e descritivo"
+            value=st.session_state.get("process_name", ""),
+            help="Nome do processo a ser automatizado"
         )
         
         responsible = st.text_input(
             "Responsável",
-            value=st.session_state.get('process_data', {}).get('responsible', ''),
-            help="Pessoa/equipe responsável"
+            value=st.session_state.get("responsible", ""),
+            help="Responsável pelo processo"
         )
         
         area = st.text_input(
             "Área",
-            value=st.session_state.get('process_data', {}).get('area', ''),
+            value=st.session_state.get("area", ""),
             help="Área/departamento do processo"
         )
         
-        # Atualiza dados na sessão
-        if 'process_data' not in st.session_state:
-            st.session_state.process_data = {}
-            
-        st.session_state.process_data.update({
-            'description': description,
-            'name': name,
+        description = st.text_area(
+            "Descrição do Processo",
+            value=st.session_state.get("description", ""),
+            help="Descreva o processo em detalhes"
+        )
+        
+        # Atualiza session_state
+        st.session_state.update({
+            'process_name': name,
             'responsible': responsible,
-            'area': area
+            'area': area,
+            'description': description
         })
         
-        # Botão de sugestões (se configurado)
-        if self.suggestion_button and description:
+        # Botão de sugestões e preview
+        if description:
             st.write("---")
-            await self.suggestion_button.render(
-                description=description,
-                current_data=st.session_state.get('process_data'),
-                disabled=not description
-            ) 
+            try:
+                # Botão de gerar sugestões
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    if st.button(
+                        "🤖 Gerar Sugestões",
+                        use_container_width=True,
+                        key="btn_suggestions"
+                    ):
+                        st.session_state.requesting_suggestions = True
+                
+                # Processa sugestões se solicitado
+                if getattr(st.session_state, 'requesting_suggestions', False):
+                    with st.spinner("Gerando sugestões..."):
+                        await self.suggestions_manager.request_suggestions(
+                            description=description,
+                            current_data=st.session_state.get('process_data')
+                        )
+                    st.session_state.requesting_suggestions = False
+                    st.rerun()
+                
+                # Renderiza preview de sugestões
+                self.render_suggestions()
+                
+            except Exception as e:
+                self.logger.error(f"Erro ao processar sugestões: {str(e)}")
+                st.error("Não foi possível gerar sugestões. Tente novamente.") 

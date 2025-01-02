@@ -1,7 +1,8 @@
 """Módulo de cache em memória."""
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 from datetime import datetime, timedelta
 from collections import OrderedDict
+import threading
 
 class InMemoryCache:
     """
@@ -9,103 +10,96 @@ class InMemoryCache:
     Implementa LRU (Least Recently Used) para gerenciamento de memória.
     """
     
-    def __init__(self, max_size: int = 1000):
+    def __init__(self, max_size: int = 1000, default_ttl: int = 3600):
         """
         Inicializa o cache.
         
         Args:
             max_size: Número máximo de itens no cache
+            default_ttl: Tempo padrão de expiração em segundos
         """
         self.max_size = max_size
+        self.default_ttl = default_ttl
         self.cache: OrderedDict[str, tuple[Any, datetime]] = OrderedDict()
-    
+        self._lock = threading.Lock()
+        
     def get(self, key: str) -> Optional[Any]:
         """
-        Obtém valor do cache.
+        Obtém um valor do cache.
         
         Args:
             key: Chave do item
             
         Returns:
-            Valor armazenado ou None se não encontrado/expirado
+            Valor armazenado ou None se não existir/expirado
         """
-        if key not in self.cache:
-            return None
+        with self._lock:
+            if key not in self.cache:
+                return None
+                
+            value, expiry = self.cache[key]
+            if expiry < datetime.now():
+                del self.cache[key]
+                return None
+                
+            # Move para o final (LRU)
+            self.cache.move_to_end(key)
+            return value
             
-        value, expiry = self.cache[key]
-        if expiry < datetime.now():
-            del self.cache[key]
-            return None
-            
-        # Move para o fim (LRU)
-        self.cache.move_to_end(key)
-        return value
-    
-    def set(
-        self, 
-        key: str, 
-        value: Any, 
-        ttl: Optional[int] = None
-    ) -> None:
+    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
         """
-        Adiciona valor ao cache.
+        Armazena um valor no cache.
         
         Args:
             key: Chave do item
-            value: Valor a ser armazenado
-            ttl: Tempo de vida em segundos (opcional)
+            value: Valor a armazenar
+            ttl: Tempo de expiração em segundos
         """
-        # Remove item mais antigo se necessário
-        if len(self.cache) >= self.max_size:
-            self.cache.popitem(last=False)
-        
-        expiry = (
-            datetime.now() + timedelta(seconds=ttl)
-            if ttl
-            else datetime.max
-        )
-        
-        self.cache[key] = (value, expiry)
-    
-    def delete(self, key: str) -> None:
+        with self._lock:
+            # Remove item mais antigo se cache cheio
+            if len(self.cache) >= self.max_size:
+                self.cache.popitem(last=False)
+                
+            expiry = datetime.now() + timedelta(
+                seconds=ttl if ttl is not None else self.default_ttl
+            )
+            self.cache[key] = (value, expiry)
+            
+    def delete(self, key: str) -> bool:
         """
-        Remove valor do cache.
+        Remove um item do cache.
         
         Args:
-            key: Chave do item a ser removido
+            key: Chave do item
+            
+        Returns:
+            bool: True se removido, False se não existia
         """
-        if key in self.cache:
-            del self.cache[key]
-    
+        with self._lock:
+            if key in self.cache:
+                del self.cache[key]
+                return True
+            return False
+            
     def clear(self) -> None:
         """Limpa todo o cache."""
-        self.cache.clear()
-    
-    def get_size(self) -> int:
+        with self._lock:
+            self.cache.clear()
+            
+    def get_many(self, keys: list[str]) -> Dict[str, Any]:
         """
-        Retorna o número de itens no cache.
+        Obtém múltiplos valores do cache.
         
+        Args:
+            keys: Lista de chaves
+            
         Returns:
-            Quantidade de itens armazenados
+            Dict com valores encontrados
         """
-        return len(self.cache)
-    
-    def get_stats(self) -> dict:
-        """
-        Retorna estatísticas do cache.
-        
-        Returns:
-            Dicionário com estatísticas de uso
-        """
-        expired = sum(
-            1 for _, expiry in self.cache.values() 
-            if expiry < datetime.now()
-        )
-        
-        return {
-            "total_items": len(self.cache),
-            "expired_items": expired,
-            "active_items": len(self.cache) - expired,
-            "max_size": self.max_size,
-            "usage_percent": (len(self.cache) / self.max_size) * 100
-        } 
+        result = {}
+        with self._lock:
+            for key in keys:
+                value = self.get(key)
+                if value is not None:
+                    result[key] = value
+        return result 
