@@ -23,7 +23,7 @@ def mock_session_state():
 @pytest.fixture
 def suggestions_manager():
     """Fixture que fornece uma instância do SuggestionsManager."""
-    return SuggestionsManager(api_key="test_key")
+    return SuggestionsManager()
 
 @pytest.fixture
 def mock_suggestions():

@@ -4,7 +4,7 @@
 Implementar sistema de sugestões automáticas usando IA para melhorar a descrição do processo e auto-preencher formulários subsequentes.
 
 ## Status Atual
-🟡 Em Andamento (75%)
+🟡 Em Andamento (90%)
 
 ### Concluído
 1. ✅ Cache em memória (InMemoryCache)
@@ -15,19 +15,22 @@ Implementar sistema de sugestões automáticas usando IA para melhorar a descri�
 6. ✅ SuggestionButton
 7. ✅ Buffer de sugestões no session_state
 8. ✅ Controle de estado das sugestões
-9. ✅ Preview contextual por formulário
+9. ✅ SuggestionsBuffer implementado
+10. ✅ Sistema de validação básico
+11. ✅ SuggestionValidator implementado
 
 ### Em Andamento
-1. 🟡 Implementar preview nos outros formulários
-2. 🟡 Sistema de distribuição de dados
-3. 🟡 Aplicação seletiva de sugestões
+1. 🟡 Integração com formulários restantes
+2. 🟡 Validações específicas por formulário
+3. 🟡 Preview de mudanças
+4. 🟡 Feedback visual
 
 ### Próximos Passos
 1. Implementar preview nos formulários:
    - [✓] ProcessDetailsForm
    - [✓] BusinessRulesForm
    - [✓] AutomationGoalsForm
-   - [ ] SystemsForm
+   - [✓] SystemsForm
    - [ ] DataForm
    - [ ] StepsForm
    - [ ] RisksForm
@@ -92,6 +95,12 @@ Implementar sistema de sugestões automáticas usando IA para melhorar a descri�
    - [ ] Criar buffer de sugestões
    - [ ] Adicionar preview em outros forms
    - [ ] Implementar aplicação seletiva
+
+3. **SystemsForm**
+   - [x] Adicionar validador específico
+   - [x] Implementar testes do validador
+   - [x] Validar integrações
+   - [x] Validar credenciais
 
 ## Componentes Principais
 
