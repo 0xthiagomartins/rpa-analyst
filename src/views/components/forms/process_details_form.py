@@ -69,4 +69,4 @@ class ProcessDetailsForm(SuggestibleForm):
         })
         
         # Renderiza sugestões se disponíveis
-        self.render_suggestions() 
+        await self.render_suggestions() 

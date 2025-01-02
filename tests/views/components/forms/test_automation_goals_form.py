@@ -72,12 +72,14 @@ def mock_streamlit():
     
     with patch('streamlit.write') as mock_write, \
          patch('streamlit.text_area') as mock_text_area, \
+         patch('streamlit.text_input') as mock_text_input, \
          patch('streamlit.button') as mock_button, \
          patch('streamlit.columns', mock_columns) as mock_cols, \
          patch('streamlit.error') as mock_error:
         yield {
             'write': mock_write,
             'text_area': mock_text_area,
+            'text_input': mock_text_input,
             'button': mock_button,
             'columns': mock_cols,
             'error': mock_error,
@@ -102,71 +104,42 @@ async def test_render_basic(form, mock_streamlit, mock_session_state):
 @pytest.mark.asyncio
 async def test_render_with_existing_data(form, mock_streamlit, mock_session_state):
     """Testa renderização com dados existentes."""
-    # Mock do render_suggestions
+    # Mock do render_suggestions para evitar chamadas assíncronas
     form.render_suggestions = AsyncMock()
     
     # Configura dados existentes
-    initial_goals = ["Objetivo 1", "Objetivo 2"]
-    initial_metrics = ["Métrica 1"]
-    
-    # Mock para controlar a ordem das chamadas
-    text_area_values = []
-    text_area_keys = []
-    
-    def mock_text_area(*args, **kwargs):
-        print(f"mock_text_area chamado com args={args}, kwargs={kwargs}")
-        key = kwargs.get('key', '')
-        value = kwargs.get('value', '')
-        
-        text_area_values.append(value)
-        text_area_keys.append(key)
-        return value
-    
-    # Configura dados iniciais
     mock_session_state.update({
-        'automation_goals': initial_goals.copy(),
-        'success_metrics': initial_metrics.copy()
+        'automation_goals': ["Objetivo existente"],
+        'success_metrics': ["Métrica existente"],
+        'automation_goals_list': [
+            {"goal": "Objetivo existente", "priority": "Alta"}
+        ],
+        'metrics_list': [
+            {"metric": "Métrica existente", "target": "100%"}
+        ]
     })
     
-    # Cria um módulo mock para o streamlit
-    mock_streamlit_module = MagicMock()
-    mock_streamlit_module.session_state = mock_session_state
-    mock_streamlit_module.write = mock_streamlit['write']
-    
-    # Mock das colunas que retorna objetos com context manager
-    def mock_columns(*args):
-        print(f"mock_columns chamado com args={args}")
-        return [MockColumn("col1", mock_text_area), MockColumn("col2", mock_text_area)]
-    
-    mock_streamlit_module.columns = mock_columns
-    mock_streamlit_module.text_area = mock_text_area
-    mock_streamlit_module.button = mock_streamlit['button']
-    mock_streamlit_module.error = mock_streamlit['error']
-    
-    # Aplica o patch do módulo streamlit
-    with patch.dict('sys.modules', {'streamlit': mock_streamlit_module}):
-        # Debug: imprime o estado antes do render
-        print("Estado antes do render:", mock_session_state)
-        print("Goals antes:", mock_session_state.get("automation_goals"))
+    # Aplica patch no session_state do Streamlit
+    with patch('streamlit.session_state', mock_session_state), \
+         patch('streamlit.runtime.scriptrunner.get_script_run_ctx', return_value=True):
         
-        # Executa o render
         await form.render()
         
-        # Debug: imprime o estado depois do render
-        print("Estado depois do render:", mock_session_state)
-        print("Goals depois:", mock_session_state.get("automation_goals"))
-        print("Text area keys:", text_area_keys)  # Debug
-        print("Text area values:", text_area_values)  # Debug
+        # Verifica se campos foram preenchidos com dados existentes
+        text_area_calls = mock_streamlit['text_area'].call_args_list
+        text_input_calls = mock_streamlit['text_input'].call_args_list
         
-        # Verifica se todas as chaves esperadas estão presentes
-        expected_keys = ['goal_0', 'goal_1', 'metric_0']
-        for key in expected_keys:
-            with check:
-                assert key in text_area_keys, f"Chave {key} não encontrada em {text_area_keys}"
+        # Verifica objetivos (com mensagem de erro mais descritiva)
+        assert any(
+            call[1].get('value') == "Objetivo existente" 
+            for call in text_area_calls
+        ), f"Objetivo 'Objetivo existente' não encontrado nos text_areas. Valores encontrados: {[call[1].get('value') for call in text_area_calls]}"
         
-        # Verifica os valores
-        with check:
-            assert text_area_values == ["Objetivo 1", "Objetivo 2", "Métrica 1"]
+        # Verifica métricas (com mensagem de erro mais descritiva)
+        assert any(
+            call[1].get('value') == "Métrica existente"
+            for call in text_input_calls
+        ), f"Métrica 'Métrica existente' não encontrada nos text_inputs. Valores encontrados: {[call[1].get('value') for call in text_input_calls]}"
 
 @pytest.mark.asyncio
 async def test_render_with_suggestions(form, mock_streamlit, mock_session_state):

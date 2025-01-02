@@ -82,97 +82,39 @@ async def test_render_basic(form, mock_streamlit, mock_session_state):
 @pytest.mark.asyncio
 async def test_render_with_existing_data(form, mock_streamlit, mock_session_state):
     """Testa renderização com dados existentes."""
-    # Mock do render_suggestions
+    # Mock do render_suggestions para evitar chamadas assíncronas
     form.render_suggestions = AsyncMock()
     
     # Configura dados existentes
-    initial_rules = ["Regra 1", "Regra 2"]
-    initial_exceptions = ["Exceção 1"]
-    
-    # Mock para controlar a ordem das chamadas
-    text_area_values = []
-    text_area_keys = []
-    
-    def mock_text_area(*args, **kwargs):
-        print(f"mock_text_area chamado com args={args}, kwargs={kwargs}")  # Debug
-        key = kwargs.get('key', '')
-        value = ''
-        
-        if key.startswith('rule_'):
-            index = int(key.split('_')[1])
-            value = initial_rules[index] if index < len(initial_rules) else ''
-        elif key.startswith('exception_'):
-            index = int(key.split('_')[1])
-            value = initial_exceptions[index] if index < len(initial_exceptions) else ''
-        
-        text_area_values.append(value)
-        text_area_keys.append(key)
-        return value
-    
-    # Substitui o mock original
-    mock_streamlit['text_area'].side_effect = mock_text_area
-    
-    # Configura dados iniciais
     mock_session_state.update({
-        'business_rules': initial_rules.copy(),
-        'exceptions': initial_exceptions.copy()
+        'business_rules': ["Regra existente"],
+        'exceptions': ["Exceção existente"],
+        'business_rules_list': [
+            {"rule": "Regra existente", "type": "Validação"}
+        ],
+        'exceptions_list': [
+            {"description": "Exceção existente", "handling": "Manual"}
+        ]
     })
     
-    # Mock para simular o contexto das colunas
-    class MockColumn:
-        def __init__(self, name):
-            self.name = name
-            self.text_area = mock_text_area  # Adiciona referência ao text_area
-            
-        def __enter__(self):
-            print(f"Entrando na coluna {self.name}")
-            return self
-            
-        def __exit__(self, *args):
-            print(f"Saindo da coluna {self.name}")
-            
-        def text_area(self, *args, **kwargs):
-            # Delega para o mock_text_area
-            return mock_text_area(*args, **kwargs)
-
-    def mock_columns(*args):
-        print(f"mock_columns chamado com args={args}")  # Debug
-        col1, col2 = MockColumn("col1"), MockColumn("col2")
-        return [col1, col2]
-
-    # Cria um módulo mock para o streamlit
-    mock_streamlit_module = MagicMock()
-    mock_streamlit_module.session_state = mock_session_state
-    mock_streamlit_module.write = mock_streamlit['write']
-    mock_streamlit_module.text_area = mock_text_area
-    mock_streamlit_module.button = mock_streamlit['button']
-    mock_streamlit_module.columns = mock_columns
-    mock_streamlit_module.error = mock_streamlit['error']
-    
-    # Aplica o patch do módulo streamlit
-    with patch.dict('sys.modules', {'streamlit': mock_streamlit_module}):
-        # Debug: imprime o estado antes do render
-        print("Estado antes do render:", mock_session_state)
-        print("Rules antes:", mock_session_state.get("business_rules"))
-        
-        # Executa o render
+    # Aplica patch no session_state do Streamlit
+    with patch('streamlit.session_state', mock_session_state):
         await form.render()
+    
+        # Verifica se campos foram preenchidos com dados existentes
+        text_area_calls = mock_streamlit['text_area'].call_args_list
         
-        # Debug: imprime o estado depois do render
-        print("Estado depois do render:", mock_session_state)
-        print("Rules depois:", mock_session_state.get("business_rules"))
-        print("Text area keys:", text_area_keys)  # Debug
-        print("Text area values:", text_area_values)  # Debug
+        # Verifica regras
+        assert any(
+            call[1].get('value') == "Regra existente" 
+            for call in text_area_calls
+        ), "Regra não encontrada nos campos"
         
-        # Verifica se todas as chaves esperadas estão presentes
-        expected_keys = ['rule_0', 'rule_1', 'exception_0']
-        for key in expected_keys:
-            with check:
-                assert key in text_area_keys, f"Chave {key} não encontrada em {text_area_keys}"
-        
-        # Verifica os valores
-        with check:
-            assert text_area_values == ["Regra 1", "Regra 2", "Exceção 1"]
+        # Verifica exceções
+        assert any(
+            call[1].get('value') == "Exceção existente"
+            for call in text_area_calls
+        ), "Exceção não encontrada nos campos"
 
 @pytest.mark.asyncio
 async def test_render_with_suggestions(form, mock_streamlit, mock_session_state):

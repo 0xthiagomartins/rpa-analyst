@@ -22,65 +22,63 @@ class AutomationGoalsForm(SuggestibleForm):
         st.write("### 🎯 Objetivos da Automação")
         needs_rerun = False
         
-        # Objetivos principais
+        # Seção de Objetivos
         st.write("#### Objetivos Principais")
-        goals = st.session_state.get("automation_goals", [])
+        goals = st.session_state.get('automation_goals', [])
         
-        # Renderiza todos os objetivos primeiro
-        for i in range(len(goals)):
+        for i, goal in enumerate(goals):
             col1, col2 = st.columns([4, 1])
             with col1:
-                new_goal = st.text_area(
+                updated_goal = st.text_area(
                     f"Objetivo {i+1}",
-                    value=goals[i],
-                    key=f"goal_{i}",
-                    on_change=lambda: None
+                    value=goal,
+                    key=f"goal_{i}"
                 )
-                if new_goal != goals[i]:
-                    goals[i] = new_goal
+                if updated_goal != goal:
+                    goals[i] = updated_goal
+                    st.session_state.automation_goals = goals
                     needs_rerun = True
             
             with col2:
                 if st.button("🗑️", key=f"del_goal_{i}"):
                     goals.pop(i)
+                    st.session_state.automation_goals = goals
                     needs_rerun = True
         
         # Botão para adicionar objetivo
         if st.button("➕ Adicionar Objetivo"):
             goals.append("")
+            st.session_state.automation_goals = goals
             needs_rerun = True
-            
-        # Métricas de sucesso
-        st.write("#### Métricas de Sucesso")
-        metrics = st.session_state.get("success_metrics", [])
         
-        # Depois renderiza todas as métricas
-        for i in range(len(metrics)):
+        # Seção de Métricas
+        st.write("#### Métricas de Sucesso")
+        metrics = st.session_state.get('success_metrics', [])
+        
+        for i, metric in enumerate(metrics):
             col1, col2 = st.columns([4, 1])
             with col1:
-                new_metric = st.text_area(
+                updated_metric = st.text_input(
                     f"Métrica {i+1}",
-                    value=metrics[i],
-                    key=f"metric_{i}",
-                    on_change=lambda: None
+                    value=metric,
+                    key=f"metric_{i}"
                 )
-                if new_metric != metrics[i]:
-                    metrics[i] = new_metric
+                if updated_metric != metric:
+                    metrics[i] = updated_metric
+                    st.session_state.success_metrics = metrics
                     needs_rerun = True
             
             with col2:
                 if st.button("🗑️", key=f"del_metric_{i}"):
                     metrics.pop(i)
+                    st.session_state.success_metrics = metrics
                     needs_rerun = True
         
         # Botão para adicionar métrica
         if st.button("➕ Adicionar Métrica"):
             metrics.append("")
+            st.session_state.success_metrics = metrics
             needs_rerun = True
-            
-        # Atualiza session_state
-        st.session_state["automation_goals"] = goals
-        st.session_state["success_metrics"] = metrics
         
         # Renderiza sugestões se disponíveis
         await self.render_suggestions()
