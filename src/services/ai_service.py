@@ -1,141 +1,120 @@
-"""Serviço de comunicação com IA."""
+"""Serviço de IA para sugestões e melhorias."""
+from typing import Dict, Any, Optional
 import json
-from typing import Optional, Dict, Any
-from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
-from src.utils.cache import InMemoryCache
-from src.utils.logger import Logger
-from .ai_types import AIResponse, FormData
+import openai
+from utils.logger import Logger
+from utils.cache import InMemoryCache
+from services.validator_service import ValidatorService, ValidationResult
 
 class AIService:
-    """Serviço de comunicação com IA."""
+    """Serviço para interação com IA."""
     
-    SYSTEM_PROMPT = """
-    Você é um assistente especializado em análise e documentação de processos. 
-    Seu objetivo é analisar descrições de processos e:
-    1. Formalizar a descrição
-    2. Identificar elementos estruturais
-    3. Sugerir melhorias
-    4. Gerar dados estruturados para documentação
-
-    Siga estritamente o formato de resposta especificado.
-    """
-    
-    def __init__(self, model_name: str = "gpt-4"):
+    def __init__(self, validator: Optional[ValidatorService] = None):
         """
         Inicializa o serviço.
         
         Args:
-            model_name: Nome do modelo a ser usado
+            validator: Validador de sugestões opcional
         """
         self.logger = Logger()
         self.cache = InMemoryCache()
-        self.llm = ChatOpenAI(
-            model_name=model_name,
-            temperature=0.7
-        )
+        self.validator = validator or ValidatorService()
 
-    async def analyze_process(
-        self,
+    async def suggest_improvements(
+        self, 
         description: str,
-        current_data: Optional[Dict] = None
-    ) -> AIResponse:
+        current_data: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
-        Analisa descrição do processo e gera sugestões.
+        Sugere melhorias para o processo.
         
         Args:
             description: Descrição do processo
-            current_data: Dados atuais dos formulários
+            current_data: Dados atuais do processo (opcional)
             
         Returns:
-            AIResponse com sugestões e dados
+            Dict com sugestões de melhoria
         """
+        # Tenta recuperar do cache
+        cache_key = f"suggestions:{description}"
+        cached = self.cache.get(cache_key)
+        if cached:
+            return cached
+
         try:
-            # Tenta obter do cache primeiro
-            cache_key = f"analysis_{hash(description)}"
-            cached = self.cache.get(cache_key)
-            if cached:
-                return cached
+            # Prepara o prompt
+            messages = [{
+                "role": "user",
+                "content": self._build_prompt(description, current_data)
+            }]
+
+            # Chama a API
+            response = await openai.ChatCompletion.acreate(
+                model="gpt-4",
+                messages=messages,
+                temperature=0.7
+            )
+
+            # Processa a resposta
+            if not response or 'choices' not in response:
+                raise ValueError("Resposta inválida da API")
                 
-            # Gera prompt
-            prompt = self._generate_prompt(description, current_data)
-            
-            # Prepara mensagens
-            messages = [
-                SystemMessage(content=self.SYSTEM_PROMPT),
-                HumanMessage(content=prompt)
-            ]
-            
-            # Faz requisição via LangChain
-            response = await self.llm.agenerate([messages])
-            result = self._parse_response(response.generations[0][0].text)
-            
+            content = response['choices'][0]['message']['content']
+            result = self._parse_response(content)
+
+            # Valida as sugestões
+            validation = self.validator.validate_suggestions(result)
+            if not validation.is_valid:
+                raise ValueError(f"Sugestões inválidas: {validation.errors}")
+
             # Salva no cache
             self.cache.set(cache_key, result)
-            
             return result
-            
+
         except Exception as e:
-            self.logger.error(f"Erro ao analisar processo: {str(e)}")
+            self.logger.error(f"Erro ao gerar sugestões: {str(e)}")
             raise
-    
-    def _generate_prompt(
+
+    def _build_prompt(
         self, 
         description: str,
-        current_data: Optional[Dict] = None
+        current_data: Optional[Dict[str, Any]] = None
     ) -> str:
-        """Gera prompt para a IA."""
-        prompt = f"""
-        Analise a seguinte descrição de processo:
-
-        {description}
-
-        Formate sua resposta como JSON com:
-        1. Descrição formal e estruturada
-        2. Dados para cada formulário do processo
-        3. Sugestões de melhoria
-        4. Validações e avisos
-        """
+        """Constrói o prompt para a IA."""
+        prompt = f"Analise o seguinte processo e sugira melhorias:\n\n{description}\n"
         
         if current_data:
-            prompt += f"\n\nDados atuais dos formulários:\n{json.dumps(current_data, indent=2)}"
+            prompt += f"\nDados atuais:\n{json.dumps(current_data, indent=2)}"
             
         return prompt
-    
-    def _parse_response(self, response: str) -> AIResponse:
+
+    def _parse_response(self, content: str) -> Dict[str, Any]:
         """
-        Parseia e valida resposta da IA.
+        Processa a resposta da IA.
         
         Args:
-            response: Resposta em texto da IA
+            content: Conteúdo da resposta
             
         Returns:
-            Resposta estruturada e validada
+            Dict com dados processados
+            
+        Raises:
+            ValueError: Se a resposta for inválida
         """
         try:
-            # Parseia JSON
-            data = json.loads(response)
-            
+            if isinstance(content, str):
+                data = json.loads(content)
+            else:
+                data = content
+
             # Valida estrutura básica
             required = {'description', 'forms_data', 'suggestions', 'validation'}
-            if not all(k in data for k in required):
-                raise ValueError("Resposta incompleta da IA")
-            
-            # Valida dados dos formulários
-            for form_id, form_data in data['forms_data'].items():
-                if not isinstance(form_data, dict):
-                    raise ValueError(f"Dados inválidos para formulário {form_id}")
-            
-            return AIResponse(
-                description=data['description'],
-                forms_data=data['forms_data'],
-                suggestions=data['suggestions'],
-                validation=data['validation']
-            )
+            if not all(field in data for field in required):
+                raise ValueError("Dados inválidos")
+
+            return data
             
         except json.JSONDecodeError:
-            self.logger.error("Falha ao decodificar JSON da resposta")
-            raise
+            raise ValueError("Resposta inválida da IA")
         except Exception as e:
-            self.logger.error(f"Erro ao parsear resposta: {str(e)}")
-            raise
+            raise ValueError(f"Erro ao processar resposta: {str(e)}")
