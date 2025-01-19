@@ -4,13 +4,13 @@
 Implementar um editor visual de fluxo de processo com geração de diagramas usando Mermaid, permitindo a edição intuitiva das conexões entre passos.
 
 ## Status Atual
-🟡 Não Iniciado (0%)
+🟡 Em Andamento (15%)
 
 ## Fases de Implementação
 
 ### Fase 1: Estrutura Base
 1. **Componentes Base**
-   - [ ] Criar FlowEditor
+   - [x] Criar FlowEditor (Implementação completa)
    - [ ] Implementar FlowchartGenerator
    - [ ] Desenvolver DiagramViewer
    - [ ] Criar FlowValidator
@@ -21,12 +21,26 @@ Implementar um editor visual de fluxo de processo com geração de diagramas usa
    - [ ] Sincronizar alterações
    - [ ] Validar consistência
 
+### Manutenção
+- [x] Corrigir warnings de coroutines não aguardadas
+- [x] Adicionar suporte adequado a async/await
+- [x] Corrigir inicialização de SuggestionsManager
+- [x] Corrigir estrutura de imports e módulos
+- [x] Adicionar MainView
+- [x] Criar estrutura base de pacotes Python
+- [x] Criar pacote de sugestões
+- [x] Implementar Logger básico
+- [x] Criar módulo de timeline do processo
+- [x] Organizar estrutura de componentes
+- [x] Corrigir acesso a atributos do formulário
+- [x] Melhorar gerenciamento de estado
+
 ### Fase 2: Editor Visual
 1. **Interface do Editor**
-   - [ ] Layout base do editor
-   - [ ] Lista de passos editável
+   - [x] Layout base do editor
+   - [x] Lista de passos editável
    - [ ] Preview do diagrama
-   - [ ] Controles de edição
+   - [x] Controles de edição
 
 2. **Gerenciamento de Conexões**
    - [ ] Interface de conexões

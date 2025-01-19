@@ -9,4 +9,7 @@ __all__ = [
     'Logger',
     'ContainerInterface',
     'DependencyContainer'
-] 
+]
+
+"""Package for utility functions and classes."""
+# Package marker 

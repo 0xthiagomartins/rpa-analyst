@@ -1,8 +1,8 @@
-"""Formulário de objetivos da automação."""
+# Package marker """Formulário de objetivos da automação."""
 from typing import Dict, Any, List
 import streamlit as st
 from src.utils.logger import Logger
-from .form_base import SuggestibleForm
+from ..form_base import SuggestibleForm
 
 class AutomationGoalsForm(SuggestibleForm):
     """Formulário de objetivos da automação."""

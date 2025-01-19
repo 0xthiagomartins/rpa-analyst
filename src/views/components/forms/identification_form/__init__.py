@@ -2,55 +2,60 @@
 import streamlit as st
 from typing import Optional, Dict
 from src.utils.logger import Logger
-from .form_base import SuggestibleForm
+from ..form_base import SuggestibleForm
+from src.views.suggestions.suggestions_manager import SuggestionsManager
 
 class IdentificationForm(SuggestibleForm):
     """Formulário de identificação do processo."""
     
     def __init__(self):
         """Inicializa o formulário."""
-        super().__init__("identification")
+        super().__init__()
+        self.suggestions_manager = SuggestionsManager()
         self.logger = Logger()
+        self._process_description = ""
 
-    async def render(self):
+    @property
+    def process_description(self) -> str:
+        """Retorna a descrição do processo."""
+        return st.session_state.get("process_description", "")
+
+    async def render(self) -> None:
         """Renderiza o formulário."""
-        st.write("### 🎯 Identificação do Processo")
+        st.write("### 📋 Identificação do Processo")
         
         # Campos do formulário
-        name = st.text_input(
+        process_name = st.text_input(
             "Nome do Processo",
             value=st.session_state.get("process_name", ""),
-            help="Nome do processo a ser automatizado"
+            help="Nome que identifica o processo"
         )
         
-        responsible = st.text_input(
+        process_owner = st.text_input(
             "Responsável",
-            value=st.session_state.get("responsible", ""),
-            help="Responsável pelo processo"
+            value=st.session_state.get("process_owner", ""),
+            help="Pessoa responsável pelo processo"
         )
         
-        area = st.text_input(
-            "Área",
-            value=st.session_state.get("area", ""),
-            help="Área/departamento do processo"
-        )
-        
-        description = st.text_area(
-            "Descrição do Processo",
-            value=st.session_state.get("description", ""),
-            help="Descreva o processo em detalhes"
+        process_description = st.text_area(
+            "Descrição",
+            value=st.session_state.get("process_description", ""),
+            help="Descrição detalhada do processo"
         )
         
         # Atualiza session_state
         st.session_state.update({
-            'process_name': name,
-            'responsible': responsible,
-            'area': area,
-            'description': description
+            'process_name': process_name,
+            'process_owner': process_owner,
+            'process_description': process_description
         })
         
-        # Botão de sugestões e preview
-        if description:
+        # Renderiza sugestões se disponíveis
+        await self.render_suggestions()
+
+    async def render_suggestions(self) -> None:
+        """Renderiza sugestões se disponíveis."""
+        if self.process_description:
             st.write("---")
             try:
                 # Botão de gerar sugestões
@@ -67,14 +72,14 @@ class IdentificationForm(SuggestibleForm):
                 if getattr(st.session_state, 'requesting_suggestions', False):
                     with st.spinner("Gerando sugestões..."):
                         await self.suggestions_manager.request_suggestions(
-                            description=description,
+                            description=self.process_description,
                             current_data=st.session_state.get('process_data')
                         )
                     st.session_state.requesting_suggestions = False
                     st.rerun()
                 
                 # Renderiza preview de sugestões
-                self.render_suggestions()
+                await self.suggestions_manager.render_preview()
                 
             except Exception as e:
                 self.logger.error(f"Erro ao processar sugestões: {str(e)}")

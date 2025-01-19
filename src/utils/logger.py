@@ -1,33 +1,37 @@
 """Módulo de logging da aplicação."""
 import logging
-from datetime import datetime
+from typing import Optional
 
 class Logger:
-    """Logger básico da aplicação."""
+    """Logger customizado da aplicação."""
     
-    def __init__(self):
+    def __init__(self, name: Optional[str] = None):
         """Inicializa o logger."""
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s'
-        )
-        self._logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(name or __name__)
+        self._setup_logger()
+    
+    def _setup_logger(self) -> None:
+        """Configura o logger."""
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(
+                '%(asctime)s - %(levelname)s - %(message)s'
+            )
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.INFO)
     
     def info(self, message: str) -> None:
         """Registra mensagem de informação."""
-        self._logger.info(message)
-    
-    def warning(self, message: str) -> None:
-        """Registra mensagem de aviso."""
-        self._logger.warning(message)
+        self.logger.info(message)
     
     def error(self, message: str) -> None:
         """Registra mensagem de erro."""
-        self._logger.error(message)
+        self.logger.error(message)
     
-    def debug(self, message: str) -> None:
-        """Registra mensagem de debug."""
-        self._logger.debug(message)
+    def warning(self, message: str) -> None:
+        """Registra mensagem de aviso."""
+        self.logger.warning(message)
 
 # Exporta apenas a classe
 __all__ = ['Logger'] 

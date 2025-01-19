@@ -2,8 +2,8 @@
 from typing import Optional, List, Dict
 import streamlit as st
 from utils.container_interface import ContainerInterface
-from views.components.forms.form_base import BaseForm
-from views.components.forms.form_field import FormField
+from ..form_base import BaseForm
+from ..form_field import FormField
 
 class DataForm(BaseForm):
     """Formulário para dados do processo."""

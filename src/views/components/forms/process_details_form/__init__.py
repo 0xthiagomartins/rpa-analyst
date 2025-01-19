@@ -2,7 +2,7 @@
 import streamlit as st
 from typing import Dict, Any
 from src.utils.logger import Logger
-from .form_base import SuggestibleForm
+from ..form_base import SuggestibleForm
 
 class ProcessDetailsForm(SuggestibleForm):
     """Formulário de detalhes do processo."""

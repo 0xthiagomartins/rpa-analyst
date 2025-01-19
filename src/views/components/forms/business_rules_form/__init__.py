@@ -2,7 +2,7 @@
 from typing import Dict, Any, List
 import streamlit as st
 from src.utils.logger import Logger
-from .form_base import SuggestibleForm
+from ..form_base import SuggestibleForm
 
 class BusinessRulesForm(SuggestibleForm):
     """Formulário de regras de negócio."""
